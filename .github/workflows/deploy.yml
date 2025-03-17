@@ -2,7 +2,7 @@ name: Deploy Game
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master, gh-pages ]
 
 jobs:
   build:
@@ -23,7 +23,7 @@ jobs:
     
     - name: Build game
       run: |
-        pygbag --build sea_game
+        pygbag --build .
     
     - name: Deploy to GitHub Pages
       uses: JamesIves/github-pages-deploy-action@4.1.4
