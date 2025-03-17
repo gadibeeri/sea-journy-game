@@ -1,4 +1,4 @@
-name: Deploy static content to Pages
+name: Deploy Game to GitHub Pages
 
 on:
   push:
@@ -18,27 +18,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Single deploy job since we're just deploying
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pygbag
+          pip install pygame==2.5.2
+
+      - name: Build game with Pygbag
+        run: |
+          pygbag --build main.py
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
-      
-      - name: Check directory contents
-        run: ls -la
-      
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
-      
+          path: 'build/web'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4 

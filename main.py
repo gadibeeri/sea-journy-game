@@ -7,6 +7,7 @@ from pygame import gfxdraw
 import sys
 from pygame import mixer
 from pathlib import Path
+import asyncio
 
 # Basic settings
 WIDTH, HEIGHT = 900, 700  # Smaller window size
