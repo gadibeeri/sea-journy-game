@@ -3,44 +3,44 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sea Journey - Reflection Game</title>
+    <title>Sea Journey - Inner Voice Battle</title>
     <style>
-        html, body {
+        body {
             margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
+            padding: 20px;
             background-color: #144238;
+            color: white;
+            font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-family: Arial, sans-serif;
-            color: white;
+            min-height: 100vh;
         }
-        #canvas {
-            border: 2px solid #DAA520;
-            border-radius: 10px;
+        h1 {
+            color: #DAA520;
+            text-align: center;
+        }
+        .game-container {
             margin: 20px;
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            max-width: 800px;
         }
-        #loading {
+        .loading {
             font-size: 24px;
             margin: 20px;
+            color: #DAA520;
         }
     </style>
 </head>
 <body>
-    <div id="loading">Loading Sea Journey...</div>
-    <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
-    <script type="text/javascript">
-        let canvas = document.getElementById('canvas');
-        canvas.width = 900;
-        canvas.height = 700;
-        
-        // Load and configure pygbag
-        let script = document.createElement('script');
-        script.src = "main.js";
-        document.body.appendChild(script);
-    </script>
+    <div class="game-container">
+        <h1>Sea Journey - Inner Voice Battle</h1>
+        <div class="loading">Loading game...</div>
+        <p>Welcome to Sea Journey, a therapeutic game about self-reflection and inner growth.</p>
+        <p>The game is currently being prepared for web deployment. Please check back soon!</p>
+    </div>
 </body>
 </html> 
