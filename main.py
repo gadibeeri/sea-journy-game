@@ -7,6 +7,7 @@ from pygame import gfxdraw
 import sys
 from pygame import mixer
 from pathlib import Path
+import asyncio
 
 # Basic settings
 WIDTH, HEIGHT = 900, 700  # Smaller window size
@@ -200,7 +201,7 @@ def get_hex_center(row, col):
 # Initialize Pygame
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Sea Journey - Reflection Game")
+pygame.display.set_caption("Sea Journey - Inner Voice Battle")
 
 # Load custom fonts
 try:
@@ -1989,108 +1990,2612 @@ battle_button = BattleButton()
 if background_music is not None:
     background_music.play(-1)
 
-while running:
-    # Store the close button rect for click detection
-    close_button_rect = None
+async def main():
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Sea Journey - Inner Voice Battle")
     
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+    # Initialize game state variables
+    game_state = GAME_STATE_MENU
+    running = True
+    battle_button = BattleButton()
+    
+    # Start background music when game starts
+    if background_music is not None:
+        background_music.play(-1)
+    
+    while running:
+        # Store the close button rect for click detection
+        close_button_rect = None
         
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Left click
-                # Get the current close button rect
-                close_button_rect = draw_close_button()
-                if close_button_rect and close_button_rect.collidepoint(event.pos):
-                    running = False
-                    pygame.quit()
-                    sys.exit()
-                
-                # Handle battle button click
-                if game_state == GAME_STATE_PLAYING and battle_button.rect.collidepoint(event.pos):
-                    game_state = GAME_STATE_BATTLE
-                    battle_messages = ["The battle begins!",
-                                    f"You have {player_card_counts[current_player]['reflection']} reflection cards",
-                                    f"and {player_card_counts[current_player]['coping']} coping cards"]
-                
-                # Handle card selection in exchange state
-                if EXCHANGE_STATE == 'selecting' and isinstance(centered_card, ExchangeInterface):
-                    for i, card in enumerate(centered_card.cards):
-                        if card['rect'].collidepoint(event.pos):
-                            centered_card.selected_index = i
-                            break
-        
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_m:  # Add music toggle with 'M' key
-                toggle_music()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
             
-            if game_state == GAME_STATE_MENU:
-                if event.key == pygame.K_1:
-                    play_sound(collect_card_sound)
-                    num_players = 1
-                    game_state = GAME_STATE_PLAYING
-                elif event.key == pygame.K_2:
-                    play_sound(collect_card_sound)
-                    num_players = 2
-                    game_state = GAME_STATE_PLAYING
-            
-            elif game_state == GAME_STATE_PLAYING and event.key == pygame.K_SPACE:
-                if waiting_for_card_interaction or EXCHANGE_STATE == 'moving':
-                    handle_card_interaction(event)
-                elif can_roll:
-                    play_sound(dice_roll_sound)
-                    current_roll = roll_dice()
-                    can_roll = False
-                    waiting_for_card_interaction, card_type = move_boat(current_roll)
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    # Get the current close button rect
+                    close_button_rect = draw_close_button()
+                    if close_button_rect and close_button_rect.collidepoint(event.pos):
+                        running = False
+                        pygame.quit()
+                        sys.exit()
                     
-                    if check_boats_meeting():
-                        waiting_for_card_interaction = True
-                        EXCHANGE_STATE = 'selecting'
-                        centered_card = ExchangeInterface(player_card_counts)
-                    elif waiting_for_card_interaction and current_card_symbol:
-                        centered_card = CenteredCard(current_card_symbol, card_type)
-                    else:
-                        can_roll = True
+                    # Handle battle button click
+                    if game_state == GAME_STATE_PLAYING and battle_button.rect.collidepoint(event.pos):
+                        game_state = GAME_STATE_BATTLE
+                        battle_messages = ["The battle begins!",
+                                        f"You have {player_card_counts[current_player]['reflection']} reflection cards",
+                                        f"and {player_card_counts[current_player]['coping']} coping cards"]
+                    
+                    # Handle card selection in exchange state
+                    if EXCHANGE_STATE == 'selecting' and isinstance(centered_card, ExchangeInterface):
+                        for i, card in enumerate(centered_card.cards):
+                            if card['rect'].collidepoint(event.pos):
+                                centered_card.selected_index = i
+                                break
             
-            elif game_state == GAME_STATE_BATTLE:
-                if event.key == pygame.K_ESCAPE:
-                    game_state = GAME_STATE_PLAYING
-                    battle_state = None
-                elif event.key == pygame.K_SPACE and battle_state and battle_state.state == BATTLE_STATE_FIGHTING:
-                    # Launch compassion flower
-                    battle_state.flowers.append(CompassionFlower(battle_state.boat_x, battle_state.boat_y - boat_size//2))
-    
-    # Draw current game state
-    if game_state == GAME_STATE_MENU:
-        draw_menu()
-    elif game_state == GAME_STATE_BATTLE:
-        if battle_state:
-            battle_state.update()
-        draw_battle_screen()
-    else:
-        draw_game_state()
-        battle_button.update(pygame.mouse.get_pos())
-        battle_button.draw(screen)
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_m:  # Add music toggle with 'M' key
+                    toggle_music()
+                
+                if game_state == GAME_STATE_MENU:
+                    if event.key == pygame.K_1:
+                        play_sound(collect_card_sound)
+                        num_players = 1
+                        game_state = GAME_STATE_PLAYING
+                    elif event.key == pygame.K_2:
+                        play_sound(collect_card_sound)
+                        num_players = 2
+                        game_state = GAME_STATE_PLAYING
+                
+                elif game_state == GAME_STATE_PLAYING and event.key == pygame.K_SPACE:
+                    if waiting_for_card_interaction or EXCHANGE_STATE == 'moving':
+                        handle_card_interaction(event)
+                    elif can_roll:
+                        play_sound(dice_roll_sound)
+                        current_roll = roll_dice()
+                        can_roll = False
+                        waiting_for_card_interaction, card_type = move_boat(current_roll)
+                        
+                        if check_boats_meeting():
+                            waiting_for_card_interaction = True
+                            EXCHANGE_STATE = 'selecting'
+                            centered_card = ExchangeInterface(player_card_counts)
+                        elif waiting_for_card_interaction and current_card_symbol:
+                            centered_card = CenteredCard(current_card_symbol, card_type)
+                        else:
+                            can_roll = True
+                
+                elif game_state == GAME_STATE_BATTLE:
+                    if event.key == pygame.K_ESCAPE:
+                        game_state = GAME_STATE_PLAYING
+                        battle_state = None
+                    elif event.key == pygame.K_SPACE and battle_state and battle_state.state == BATTLE_STATE_FIGHTING:
+                        # Launch compassion flower
+                        battle_state.flowers.append(CompassionFlower(battle_state.boat_x, battle_state.boat_y - boat_size//2))
         
-        if waiting_for_card_interaction and centered_card:
-            centered_card.update()
-            centered_card.draw(screen)
+        # Draw current game state
+        if game_state == GAME_STATE_MENU:
+            draw_menu()
+        elif game_state == GAME_STATE_BATTLE:
+            if battle_state:
+                battle_state.update()
+            draw_battle_screen()
+        else:
+            draw_game_state()
+            battle_button.update(pygame.mouse.get_pos())
+            battle_button.draw(screen)
+            
+            if waiting_for_card_interaction and centered_card:
+                centered_card.update()
+                centered_card.draw(screen)
+            
+            # Update and draw card animations
+            if animation_cards:
+                for card in animation_cards[:]:
+                    card.update()
+                    card.draw(screen, pygame.font.Font(None, 20))
+                    if not card.moving:
+                        animation_cards.remove(card)
         
-        # Update and draw card animations
-        if animation_cards:
-            for card in animation_cards[:]:
-                card.update()
-                card.draw(screen, pygame.font.Font(None, 20))
-                if not card.moving:
-                    animation_cards.remove(card)
+        # Always draw the close button last so it's on top
+        close_button_rect = draw_close_button()
+        pygame.display.flip()
+        await asyncio.sleep(0)  # Required for web compatibility
     
-    # Always draw the close button last so it's on top
-    close_button_rect = draw_close_button()
-    pygame.display.flip()
-    pygame.time.Clock().tick(60)
+    pygame.quit()
+    if background_music is not None:
+        background_music.stop()
+    mixer.quit()
 
-pygame.quit()
+# Initialize battle state
+battle_state = None
+battle_animation_time = 0
+battle_result = None
+battle_messages = []
+BATTLE_STATE_INTRO = 'intro'
+BATTLE_STATE_FIGHTING = 'fighting'
+BATTLE_STATE_WIN = 'win'
+BATTLE_STATE_LOSE = 'lose'
+BOAT_BATTLE_SPEED = 5
+ROCK_SPEED = 4
+FLOWER_SPEED = 7
+MONSTER_HITS_TO_WIN = 20  # Increased from 10 to 20 hits
+BOAT_STARTING_HEALTH = 3
+
+class BattleState:
+    def __init__(self):
+        self.state = BATTLE_STATE_INTRO
+        self.boat_x = WIDTH * 0.2
+        self.boat_y = HEIGHT * 0.8
+        self.monster_x = WIDTH * 0.8
+        self.monster_y = HEIGHT * 0.3
+        self.monster_size = 200
+        self.monster_health = MONSTER_HITS_TO_WIN
+        self.boat_health = BOAT_STARTING_HEALTH
+        self.rocks = []
+        self.flowers = []
+        self.rock_spawn_timer = 0
+        self.monster_move_timer = 0
+        self.intro_timer = 0
+        self.monster_visible = True
+        self.monster_moving = False
+        self.monster_target_x = self.monster_x
+        self.boat_rect = pygame.Rect(self.boat_x - boat_size//2, 
+                                   self.boat_y - boat_size//2, 
+                                   boat_size, boat_size)
+        self.monster_rect = pygame.Rect(self.monster_x - self.monster_size//2, 
+                                      self.monster_y - self.monster_size//2,
+                                      self.monster_size, self.monster_size)
+
+    def update(self):
+        if self.state == BATTLE_STATE_INTRO:
+            self.intro_timer += 1
+            if self.intro_timer > 180:  # 3 seconds at 60 FPS
+                self.state = BATTLE_STATE_FIGHTING
+        
+        elif self.state == BATTLE_STATE_FIGHTING:
+            # Update boat position based on keyboard input
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT]:
+                self.boat_x = max(boat_size//2, self.boat_x - BOAT_BATTLE_SPEED)
+            if keys[pygame.K_RIGHT]:
+                self.boat_x = min(WIDTH - boat_size//2, self.boat_x + BOAT_BATTLE_SPEED)
+            
+            # Update boat rect
+            self.boat_rect.x = self.boat_x - boat_size//2
+            self.boat_rect.y = self.boat_y - boat_size//2
+            
+            # Monster movement
+            if not self.monster_moving and random.random() < 0.02:  # 2% chance to start moving
+                self.monster_moving = True
+                self.monster_visible = False
+                self.monster_target_x = random.randint(int(WIDTH * 0.6), int(WIDTH * 0.9))
+                self.monster_y = HEIGHT * 0.3  # Reset height when moving
+            
+            if self.monster_moving:
+                self.monster_move_timer += 1
+                if self.monster_move_timer > 60:  # Show monster after 1 second
+                    self.monster_visible = True
+                    # Move towards target
+                    dx = self.monster_target_x - self.monster_x
+                    if abs(dx) < 2:
+                        self.monster_moving = False
+                        self.monster_move_timer = 0
+                    else:
+                        self.monster_x += dx * 0.1
+            
+            # Update monster rect
+            self.monster_rect.x = self.monster_x - self.monster_size//2
+            self.monster_rect.y = self.monster_y - self.monster_size//2
+            
+            # Spawn rocks with increasing frequency as monster gets smaller
+            spawn_rate = max(15, 45 - (MONSTER_HITS_TO_WIN - self.monster_health))  # More aggressive scaling
+            self.rock_spawn_timer += 1
+            if self.rock_spawn_timer > spawn_rate and self.monster_visible:
+                self.rock_spawn_timer = 0
+                num_rocks = min(5, 2 + (MONSTER_HITS_TO_WIN - self.monster_health) // 4)  # Increase rocks based on damage
+                for _ in range(num_rocks):  # Spawn multiple rocks
+                    rock_x = self.monster_x + random.randint(-50, 50)
+                    self.rocks.append(Rock(rock_x, self.monster_y + self.monster_size//2))
+            
+            # Update and check rocks
+            for rock in self.rocks[:]:
+                rock.update()
+                if rock.y > HEIGHT:
+                    self.rocks.remove(rock)
+                elif rock.rect.colliderect(self.boat_rect):
+                    self.rocks.remove(rock)
+                    self.boat_health -= 1
+                    if self.boat_health <= 0:
+                        self.state = BATTLE_STATE_LOSE
+            
+            # Update and check flowers
+            for flower in self.flowers[:]:
+                flower.update()
+                if flower.y < 0:
+                    self.flowers.remove(flower)
+                elif self.monster_visible and flower.rect.colliderect(self.monster_rect):
+                    self.flowers.remove(flower)
+                    self.monster_health -= 1
+                    # Make monster smaller but increase attack frequency
+                    self.monster_size = max(40, 200 - (MONSTER_HITS_TO_WIN - self.monster_health) * 8)
+                    if self.monster_health <= 0:
+                        self.state = BATTLE_STATE_WIN
+
+class Rock:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 30
+        self.height = 30
+        self.speed = ROCK_SPEED
+        self.rect = pygame.Rect(x, y, self.width, self.height)
+    
+    def update(self):
+        self.y += self.speed
+        self.rect.y = self.y
+    
+    def draw(self, screen):
+        pygame.draw.circle(screen, (139, 69, 19), 
+                         (self.x + self.width//2, self.y + self.height//2), 
+                         self.width//2)
+
+class CompassionFlower:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 20
+        self.height = 20
+        self.speed = FLOWER_SPEED
+        self.rect = pygame.Rect(x, y, self.width, self.height)
+    
+    def update(self):
+        self.y -= self.speed
+        self.rect.y = self.y
+    
+    def draw(self, screen):
+        # Draw flower petals
+        petal_color = (255, 192, 203)  # Pink
+        center_color = (255, 255, 0)   # Yellow
+        center = (self.x + self.width//2, self.y + self.height//2)
+        
+        for i in range(6):
+            angle = i * 60
+            x = center[0] + math.cos(math.radians(angle)) * 8
+            y = center[1] + math.sin(math.radians(angle)) * 8
+            pygame.draw.circle(screen, petal_color, (int(x), int(y)), 6)
+        
+        # Draw flower center
+        pygame.draw.circle(screen, center_color, center, 5)
+
+class BattleButton:
+    def __init__(self):
+        self.width = 200
+        self.height = 50
+        self.x = 20  # Changed from right side to left side
+        self.y = HEIGHT - self.height - 20  # Keep at bottom
+        self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        self.color = (220, 20, 60)  # Crimson red
+        self.hover_color = (240, 128, 128)  # Light coral
+        self.is_hovered = False
+        self.text = "Inner Voice Monster"
+        
+    def update(self, mouse_pos):
+        self.is_hovered = self.rect.collidepoint(mouse_pos)
+        
+    def draw(self, screen):
+        color = self.hover_color if self.is_hovered else self.color
+        
+        # Draw button with gradient and glow effect
+        if self.is_hovered:
+            # Draw glow
+            glow_surface = pygame.Surface((self.width + 10, self.height + 10), pygame.SRCALPHA)
+            pygame.draw.rect(glow_surface, (*color[:3], 100), 
+                           (0, 0, self.width + 10, self.height + 10), border_radius=15)
+            screen.blit(glow_surface, (self.x - 5, self.y - 5))
+        
+        # Draw button background with gradient
+        gradient_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        for i in range(self.height):
+            progress = i / self.height
+            current_color = (
+                int(color[0] + (255 - color[0]) * progress * 0.5),
+                int(color[1] + (255 - color[1]) * progress * 0.5),
+                int(color[2] + (255 - color[2]) * progress * 0.5)
+            )
+            pygame.draw.line(gradient_surface, current_color, (0, i), (self.width, i))
+        
+        # Apply gradient to button
+        button_rect = pygame.Rect(0, 0, self.width, self.height)
+        pygame.draw.rect(gradient_surface, color, button_rect, border_radius=10)
+        screen.blit(gradient_surface, (self.x, self.y))
+        
+        # Draw border
+        pygame.draw.rect(screen, BLACK, self.rect, 2, border_radius=10)
+        
+        # Draw text with shadow
+        text_surface = game_font.render(self.text, True, WHITE)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        
+        # Draw shadow
+        shadow_surface = game_font.render(self.text, True, (0, 0, 0, 100))
+        shadow_rect = text_rect.copy()
+        shadow_rect.x += 2
+        shadow_rect.y += 2
+        screen.blit(shadow_surface, shadow_rect)
+        
+        # Draw main text
+        screen.blit(text_surface, text_rect)
+
+def draw_battle_screen():
+    """Draw the battle screen with the octopus monster and battle mechanics"""
+    global battle_state, game_state, player_card_counts, current_player, battle_animation_time
+    
+    if battle_state is None:
+        battle_state = BattleState()
+    
+    # Update animation time
+    battle_animation_time += 0.1
+    
+    # Fill background with dark sea color
+    screen.fill((0, 45, 98))
+    
+    # Draw animated waves
+    wave_height = HEIGHT * 0.85
+    for i in range(WIDTH):
+        x = i
+        y = wave_height + math.sin(battle_animation_time * 0.05 + i * 0.02) * 20
+        pygame.draw.line(screen, WAVE_COLOR, (x, y), (x, HEIGHT))
+    
+    # Draw battle state specific elements
+    if battle_state.state == BATTLE_STATE_INTRO:
+        # Draw emerging monster animation
+        emerge_progress = min(1.0, battle_state.intro_timer / 180)
+        monster_y = HEIGHT - (HEIGHT - battle_state.monster_y) * emerge_progress
+        
+        # Draw monster (octopus)
+        draw_octopus(battle_state.monster_x, monster_y, battle_state.monster_size)
+        
+        # Draw intro text with enhanced readability
+        # Create text background
+        text = title_font.render("Inner Voice Monster Appears!", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//3))
+        
+        # Draw text background
+        bg_rect = text_rect.copy()
+        bg_rect.inflate_ip(20, 10)
+        pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+        
+        # Draw text with glow
+        glow_surface = pygame.Surface(text.get_size(), pygame.SRCALPHA)
+        glow_color = (255, 255, 255, 50)
+        glow_text = title_font.render("Inner Voice Monster Appears!", True, glow_color)
+        for offset in range(0, 10, 2):
+            screen.blit(glow_text, (text_rect.x - offset, text_rect.y))
+            screen.blit(glow_text, (text_rect.x + offset, text_rect.y))
+        screen.blit(text, text_rect)
+    
+    elif battle_state.state == BATTLE_STATE_FIGHTING:
+        # Draw monster if visible
+        if battle_state.monster_visible:
+            draw_octopus(battle_state.monster_x, battle_state.monster_y, 
+                        battle_state.monster_size)
+            
+            # Show "Critical Thoughts Attack" with enhanced readability
+            if len(battle_state.rocks) > 0:
+                attack_text = game_font.render("Critical Thoughts Attack!", True, (255, 0, 0))
+                text_rect = attack_text.get_rect(centerx=WIDTH//2, y=50)
+                
+                # Draw text background
+                bg_rect = text_rect.copy()
+                bg_rect.inflate_ip(20, 10)
+                pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+                
+                # Add glow effect
+                glow_surface = pygame.Surface(attack_text.get_size(), pygame.SRCALPHA)
+                for i in range(10):
+                    alpha = int(150 * (1 - i/10))  # Increased alpha for better visibility
+                    color = (255, 0, 0, alpha)
+                    glow_text = game_font.render("Critical Thoughts Attack!", True, color)
+                    screen.blit(glow_text, (text_rect.x - i, text_rect.y))
+                screen.blit(attack_text, text_rect)
+        
+        # Draw rocks with enhanced effects
+        for rock in battle_state.rocks:
+            rock.draw(screen)
+        
+        # Draw flowers
+        for flower in battle_state.flowers:
+            flower.draw(screen)
+            # Show "Compassion Attack" with enhanced readability
+            if len(battle_state.flowers) > 0:
+                attack_text = game_font.render("Compassion Attack!", True, (255, 192, 203))
+                text_rect = attack_text.get_rect(centerx=WIDTH//2, bottom=HEIGHT-50)
+                
+                # Draw text background
+                bg_rect = text_rect.copy()
+                bg_rect.inflate_ip(20, 10)
+                pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+                
+                # Add glow effect
+                glow_surface = pygame.Surface(attack_text.get_size(), pygame.SRCALPHA)
+                for i in range(10):
+                    alpha = int(150 * (1 - i/10))  # Increased alpha for better visibility
+                    color = (255, 192, 203, alpha)
+                    glow_text = game_font.render("Compassion Attack!", True, color)
+                    screen.blit(glow_text, (text_rect.x - i, text_rect.y))
+                screen.blit(attack_text, text_rect)
+        
+        # Draw boat with wave effect
+        boat_y_offset = math.sin(battle_animation_time * 2) * 5
+        rotated_boat = pygame.transform.rotate(boat_image, 
+                                            math.sin(battle_animation_time) * 5)
+        boat_rect = rotated_boat.get_rect(center=(battle_state.boat_x, 
+                                                 battle_state.boat_y + boat_y_offset))
+        screen.blit(rotated_boat, boat_rect)
+        
+        # Draw health bars
+        draw_battle_ui(battle_state)
+    
+    elif battle_state.state == BATTLE_STATE_WIN:
+        text = title_font.render("You defeated the Inner Voice Monster!", True, GOLD)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        screen.blit(text, text_rect)
+        
+        text = game_font.render("Press ESC to continue your journey", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2 + 60))
+        screen.blit(text, text_rect)
+        
+        # Set game as won
+        game_state = GAME_STATE_WINNER
+    
+    elif battle_state.state == BATTLE_STATE_LOSE:
+        text = title_font.render("The Monster overwhelmed you...", True, RED)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        screen.blit(text, text_rect)
+        
+        text = game_font.render("Press ESC to return to your journey", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2 + 60))
+        screen.blit(text, text_rect)
+        
+        # Reset player's cards
+        player_card_counts[current_player] = {'reflection': 0, 'coping': 0}
+        collected_cards[current_player] = {'reflection': [], 'coping': []}
+
+def draw_octopus(x, y, size):
+    """Draw the octopus monster with enhanced graphics"""
+    # Draw glowing effect
+    glow_radius = size * 0.6 + math.sin(battle_animation_time * 0.1) * 10
+    glow_surface = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
+    for r in range(int(glow_radius), 0, -2):
+        alpha = int(100 * (r / glow_radius))
+        pygame.draw.circle(glow_surface, (128, 0, 128, alpha), 
+                         (glow_radius, glow_radius), r)
+    screen.blit(glow_surface, (x - glow_radius, y - glow_radius))
+
+    # Draw tentacles with gradient and wave effect
+    for i in range(8):  # Increased number of tentacles
+        angle = i * 45 + math.sin(battle_animation_time * 0.1) * 20
+        length = size * 1.2  # Longer tentacles
+        
+        # Create multiple segments for each tentacle
+        points = []
+        segments = 8  # More segments for smoother tentacles
+        for j in range(segments + 1):
+            progress = j / segments
+            segment_length = length * progress
+            wave_offset = math.sin(battle_animation_time * 0.2 + progress * 4) * (size * 0.2)
+            
+            segment_x = x + math.cos(math.radians(angle)) * segment_length
+            segment_y = y + math.sin(math.radians(angle)) * segment_length
+            
+            # Add wave motion
+            segment_x += math.cos(math.radians(angle + 90)) * wave_offset
+            segment_y += math.sin(math.radians(angle + 90)) * wave_offset
+            
+            points.append((segment_x, segment_y))
+        
+        # Draw tentacle with gradient
+        if len(points) >= 2:
+            for k in range(len(points) - 1):
+                progress = k / (len(points) - 1)
+                thickness = int((1 - progress) * size * 0.2)
+                color = (
+                    128 + int(progress * 40),
+                    0,
+                    128 + int(progress * 40),
+                )
+                pygame.draw.line(screen, color, points[k], points[k + 1], thickness)
+
+    # Draw body with gradient
+    body_radius = int(size * 0.5)
+    body_surface = pygame.Surface((body_radius * 2, body_radius * 2), pygame.SRCALPHA)
+    for r in range(body_radius, 0, -1):
+        progress = r / body_radius
+        color = (
+            128 + int((1 - progress) * 40),
+            0,
+            128 + int((1 - progress) * 40),
+            255
+        )
+        pygame.draw.circle(body_surface, color, (body_radius, body_radius), r)
+    screen.blit(body_surface, (x - body_radius, y - body_radius))
+
+    # Draw eyes with glow
+    eye_size = size * 0.15
+    eye_offset = size * 0.2
+    
+    # Draw eye glow
+    for eye_x in [x - eye_offset, x + eye_offset]:
+        glow_size = eye_size * 1.5
+        eye_glow = pygame.Surface((int(glow_size * 2), int(glow_size * 2)), pygame.SRCALPHA)
+        for r in range(int(glow_size), 0, -1):
+            alpha = int(100 * (r / glow_size))
+            pygame.draw.circle(eye_glow, (255, 0, 0, alpha), 
+                             (glow_size, glow_size), r)
+        screen.blit(eye_glow, (eye_x - glow_size, y - glow_size))
+    
+    # Draw main eyes
+    for eye_x in [x - eye_offset, x + eye_offset]:
+        pygame.draw.circle(screen, (255, 255, 255), (int(eye_x), int(y)), int(eye_size))
+        pygame.draw.circle(screen, (255, 0, 0), (int(eye_x), int(y)), int(eye_size * 0.6))
+        pygame.draw.circle(screen, (0, 0, 0), (int(eye_x), int(y)), int(eye_size * 0.3))
+        # Add highlight
+        pygame.draw.circle(screen, (255, 255, 255), 
+                         (int(eye_x - eye_size * 0.2), int(y - eye_size * 0.2)), 
+                         int(eye_size * 0.1))
+
+def draw_battle_ui(battle_state):
+    """Draw the battle UI including health bars and instructions"""
+    # Draw boat health
+    health_width = 200
+    health_height = 20
+    health_x = 20
+    health_y = 20
+    
+    pygame.draw.rect(screen, (64, 64, 64), (health_x, health_y, health_width, health_height))
+    health_percent = battle_state.boat_health / BOAT_STARTING_HEALTH
+    pygame.draw.rect(screen, (0, 255, 0), 
+                    (health_x, health_y, health_width * health_percent, health_height))
+    
+    # Draw monster health
+    monster_health_x = WIDTH - health_width - 20
+    pygame.draw.rect(screen, (64, 64, 64), 
+                    (monster_health_x, health_y, health_width, health_height))
+    monster_health_percent = battle_state.monster_health / MONSTER_HITS_TO_WIN
+    pygame.draw.rect(screen, (255, 0, 0), 
+                    (monster_health_x, health_y, health_width * monster_health_percent, 
+                     health_height))
+    
+    # Draw instructions
+    instructions = [
+        "← → : Move boat",
+        "SPACE : Launch compassion flower",
+        "ESC : Retreat"
+    ]
+    
+    y = HEIGHT - 100
+    for instruction in instructions:
+        text = instruction_font.render(instruction, True, WHITE)
+        text_rect = text.get_rect(left=20, top=y)
+        screen.blit(text, text_rect)
+        y += 25
+
+# Initialize battle button
+battle_button = BattleButton()
+
+# Start background music when game starts
 if background_music is not None:
-    background_music.stop()
-mixer.quit()
-sys.exit()  # Make sure the program exits completely
+    background_music.play(-1)
+
+async def main():
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Sea Journey - Inner Voice Battle")
+    
+    # Initialize game state variables
+    game_state = GAME_STATE_MENU
+    running = True
+    battle_button = BattleButton()
+    
+    # Start background music when game starts
+    if background_music is not None:
+        background_music.play(-1)
+    
+    while running:
+        # Store the close button rect for click detection
+        close_button_rect = None
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    # Get the current close button rect
+                    close_button_rect = draw_close_button()
+                    if close_button_rect and close_button_rect.collidepoint(event.pos):
+                        running = False
+                        pygame.quit()
+                        sys.exit()
+                    
+                    # Handle battle button click
+                    if game_state == GAME_STATE_PLAYING and battle_button.rect.collidepoint(event.pos):
+                        game_state = GAME_STATE_BATTLE
+                        battle_messages = ["The battle begins!",
+                                        f"You have {player_card_counts[current_player]['reflection']} reflection cards",
+                                        f"and {player_card_counts[current_player]['coping']} coping cards"]
+                    
+                    # Handle card selection in exchange state
+                    if EXCHANGE_STATE == 'selecting' and isinstance(centered_card, ExchangeInterface):
+                        for i, card in enumerate(centered_card.cards):
+                            if card['rect'].collidepoint(event.pos):
+                                centered_card.selected_index = i
+                                break
+            
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_m:  # Add music toggle with 'M' key
+                    toggle_music()
+                
+                if game_state == GAME_STATE_MENU:
+                    if event.key == pygame.K_1:
+                        play_sound(collect_card_sound)
+                        num_players = 1
+                        game_state = GAME_STATE_PLAYING
+                    elif event.key == pygame.K_2:
+                        play_sound(collect_card_sound)
+                        num_players = 2
+                        game_state = GAME_STATE_PLAYING
+                
+                elif game_state == GAME_STATE_PLAYING and event.key == pygame.K_SPACE:
+                    if waiting_for_card_interaction or EXCHANGE_STATE == 'moving':
+                        handle_card_interaction(event)
+                    elif can_roll:
+                        play_sound(dice_roll_sound)
+                        current_roll = roll_dice()
+                        can_roll = False
+                        waiting_for_card_interaction, card_type = move_boat(current_roll)
+                        
+                        if check_boats_meeting():
+                            waiting_for_card_interaction = True
+                            EXCHANGE_STATE = 'selecting'
+                            centered_card = ExchangeInterface(player_card_counts)
+                        elif waiting_for_card_interaction and current_card_symbol:
+                            centered_card = CenteredCard(current_card_symbol, card_type)
+                        else:
+                            can_roll = True
+                
+                elif game_state == GAME_STATE_BATTLE:
+                    if event.key == pygame.K_ESCAPE:
+                        game_state = GAME_STATE_PLAYING
+                        battle_state = None
+                    elif event.key == pygame.K_SPACE and battle_state and battle_state.state == BATTLE_STATE_FIGHTING:
+                        # Launch compassion flower
+                        battle_state.flowers.append(CompassionFlower(battle_state.boat_x, battle_state.boat_y - boat_size//2))
+        
+        # Draw current game state
+        if game_state == GAME_STATE_MENU:
+            draw_menu()
+        elif game_state == GAME_STATE_BATTLE:
+            if battle_state:
+                battle_state.update()
+            draw_battle_screen()
+        else:
+            draw_game_state()
+            battle_button.update(pygame.mouse.get_pos())
+            battle_button.draw(screen)
+            
+            if waiting_for_card_interaction and centered_card:
+                centered_card.update()
+                centered_card.draw(screen)
+            
+            # Update and draw card animations
+            if animation_cards:
+                for card in animation_cards[:]:
+                    card.update()
+                    card.draw(screen, pygame.font.Font(None, 20))
+                    if not card.moving:
+                        animation_cards.remove(card)
+        
+        # Always draw the close button last so it's on top
+        close_button_rect = draw_close_button()
+        pygame.display.flip()
+        await asyncio.sleep(0)  # Required for web compatibility
+    
+    pygame.quit()
+    if background_music is not None:
+        background_music.stop()
+    mixer.quit()
+
+# Initialize battle state
+battle_state = None
+battle_animation_time = 0
+battle_result = None
+battle_messages = []
+BATTLE_STATE_INTRO = 'intro'
+BATTLE_STATE_FIGHTING = 'fighting'
+BATTLE_STATE_WIN = 'win'
+BATTLE_STATE_LOSE = 'lose'
+BOAT_BATTLE_SPEED = 5
+ROCK_SPEED = 4
+FLOWER_SPEED = 7
+MONSTER_HITS_TO_WIN = 20  # Increased from 10 to 20 hits
+BOAT_STARTING_HEALTH = 3
+
+class BattleState:
+    def __init__(self):
+        self.state = BATTLE_STATE_INTRO
+        self.boat_x = WIDTH * 0.2
+        self.boat_y = HEIGHT * 0.8
+        self.monster_x = WIDTH * 0.8
+        self.monster_y = HEIGHT * 0.3
+        self.monster_size = 200
+        self.monster_health = MONSTER_HITS_TO_WIN
+        self.boat_health = BOAT_STARTING_HEALTH
+        self.rocks = []
+        self.flowers = []
+        self.rock_spawn_timer = 0
+        self.monster_move_timer = 0
+        self.intro_timer = 0
+        self.monster_visible = True
+        self.monster_moving = False
+        self.monster_target_x = self.monster_x
+        self.boat_rect = pygame.Rect(self.boat_x - boat_size//2, 
+                                   self.boat_y - boat_size//2, 
+                                   boat_size, boat_size)
+        self.monster_rect = pygame.Rect(self.monster_x - self.monster_size//2, 
+                                      self.monster_y - self.monster_size//2,
+                                      self.monster_size, self.monster_size)
+
+    def update(self):
+        if self.state == BATTLE_STATE_INTRO:
+            self.intro_timer += 1
+            if self.intro_timer > 180:  # 3 seconds at 60 FPS
+                self.state = BATTLE_STATE_FIGHTING
+        
+        elif self.state == BATTLE_STATE_FIGHTING:
+            # Update boat position based on keyboard input
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT]:
+                self.boat_x = max(boat_size//2, self.boat_x - BOAT_BATTLE_SPEED)
+            if keys[pygame.K_RIGHT]:
+                self.boat_x = min(WIDTH - boat_size//2, self.boat_x + BOAT_BATTLE_SPEED)
+            
+            # Update boat rect
+            self.boat_rect.x = self.boat_x - boat_size//2
+            self.boat_rect.y = self.boat_y - boat_size//2
+            
+            # Monster movement
+            if not self.monster_moving and random.random() < 0.02:  # 2% chance to start moving
+                self.monster_moving = True
+                self.monster_visible = False
+                self.monster_target_x = random.randint(int(WIDTH * 0.6), int(WIDTH * 0.9))
+                self.monster_y = HEIGHT * 0.3  # Reset height when moving
+            
+            if self.monster_moving:
+                self.monster_move_timer += 1
+                if self.monster_move_timer > 60:  # Show monster after 1 second
+                    self.monster_visible = True
+                    # Move towards target
+                    dx = self.monster_target_x - self.monster_x
+                    if abs(dx) < 2:
+                        self.monster_moving = False
+                        self.monster_move_timer = 0
+                    else:
+                        self.monster_x += dx * 0.1
+            
+            # Update monster rect
+            self.monster_rect.x = self.monster_x - self.monster_size//2
+            self.monster_rect.y = self.monster_y - self.monster_size//2
+            
+            # Spawn rocks with increasing frequency as monster gets smaller
+            spawn_rate = max(15, 45 - (MONSTER_HITS_TO_WIN - self.monster_health))  # More aggressive scaling
+            self.rock_spawn_timer += 1
+            if self.rock_spawn_timer > spawn_rate and self.monster_visible:
+                self.rock_spawn_timer = 0
+                num_rocks = min(5, 2 + (MONSTER_HITS_TO_WIN - self.monster_health) // 4)  # Increase rocks based on damage
+                for _ in range(num_rocks):  # Spawn multiple rocks
+                    rock_x = self.monster_x + random.randint(-50, 50)
+                    self.rocks.append(Rock(rock_x, self.monster_y + self.monster_size//2))
+            
+            # Update and check rocks
+            for rock in self.rocks[:]:
+                rock.update()
+                if rock.y > HEIGHT:
+                    self.rocks.remove(rock)
+                elif rock.rect.colliderect(self.boat_rect):
+                    self.rocks.remove(rock)
+                    self.boat_health -= 1
+                    if self.boat_health <= 0:
+                        self.state = BATTLE_STATE_LOSE
+            
+            # Update and check flowers
+            for flower in self.flowers[:]:
+                flower.update()
+                if flower.y < 0:
+                    self.flowers.remove(flower)
+                elif self.monster_visible and flower.rect.colliderect(self.monster_rect):
+                    self.flowers.remove(flower)
+                    self.monster_health -= 1
+                    # Make monster smaller but increase attack frequency
+                    self.monster_size = max(40, 200 - (MONSTER_HITS_TO_WIN - self.monster_health) * 8)
+                    if self.monster_health <= 0:
+                        self.state = BATTLE_STATE_WIN
+
+class Rock:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 30
+        self.height = 30
+        self.speed = ROCK_SPEED
+        self.rect = pygame.Rect(x, y, self.width, self.height)
+    
+    def update(self):
+        self.y += self.speed
+        self.rect.y = self.y
+    
+    def draw(self, screen):
+        pygame.draw.circle(screen, (139, 69, 19), 
+                         (self.x + self.width//2, self.y + self.height//2), 
+                         self.width//2)
+
+class CompassionFlower:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 20
+        self.height = 20
+        self.speed = FLOWER_SPEED
+        self.rect = pygame.Rect(x, y, self.width, self.height)
+    
+    def update(self):
+        self.y -= self.speed
+        self.rect.y = self.y
+    
+    def draw(self, screen):
+        # Draw flower petals
+        petal_color = (255, 192, 203)  # Pink
+        center_color = (255, 255, 0)   # Yellow
+        center = (self.x + self.width//2, self.y + self.height//2)
+        
+        for i in range(6):
+            angle = i * 60
+            x = center[0] + math.cos(math.radians(angle)) * 8
+            y = center[1] + math.sin(math.radians(angle)) * 8
+            pygame.draw.circle(screen, petal_color, (int(x), int(y)), 6)
+        
+        # Draw flower center
+        pygame.draw.circle(screen, center_color, center, 5)
+
+class BattleButton:
+    def __init__(self):
+        self.width = 200
+        self.height = 50
+        self.x = 20  # Changed from right side to left side
+        self.y = HEIGHT - self.height - 20  # Keep at bottom
+        self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        self.color = (220, 20, 60)  # Crimson red
+        self.hover_color = (240, 128, 128)  # Light coral
+        self.is_hovered = False
+        self.text = "Inner Voice Monster"
+        
+    def update(self, mouse_pos):
+        self.is_hovered = self.rect.collidepoint(mouse_pos)
+        
+    def draw(self, screen):
+        color = self.hover_color if self.is_hovered else self.color
+        
+        # Draw button with gradient and glow effect
+        if self.is_hovered:
+            # Draw glow
+            glow_surface = pygame.Surface((self.width + 10, self.height + 10), pygame.SRCALPHA)
+            pygame.draw.rect(glow_surface, (*color[:3], 100), 
+                           (0, 0, self.width + 10, self.height + 10), border_radius=15)
+            screen.blit(glow_surface, (self.x - 5, self.y - 5))
+        
+        # Draw button background with gradient
+        gradient_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        for i in range(self.height):
+            progress = i / self.height
+            current_color = (
+                int(color[0] + (255 - color[0]) * progress * 0.5),
+                int(color[1] + (255 - color[1]) * progress * 0.5),
+                int(color[2] + (255 - color[2]) * progress * 0.5)
+            )
+            pygame.draw.line(gradient_surface, current_color, (0, i), (self.width, i))
+        
+        # Apply gradient to button
+        button_rect = pygame.Rect(0, 0, self.width, self.height)
+        pygame.draw.rect(gradient_surface, color, button_rect, border_radius=10)
+        screen.blit(gradient_surface, (self.x, self.y))
+        
+        # Draw border
+        pygame.draw.rect(screen, BLACK, self.rect, 2, border_radius=10)
+        
+        # Draw text with shadow
+        text_surface = game_font.render(self.text, True, WHITE)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        
+        # Draw shadow
+        shadow_surface = game_font.render(self.text, True, (0, 0, 0, 100))
+        shadow_rect = text_rect.copy()
+        shadow_rect.x += 2
+        shadow_rect.y += 2
+        screen.blit(shadow_surface, shadow_rect)
+        
+        # Draw main text
+        screen.blit(text_surface, text_rect)
+
+def draw_battle_screen():
+    """Draw the battle screen with the octopus monster and battle mechanics"""
+    global battle_state, game_state, player_card_counts, current_player, battle_animation_time
+    
+    if battle_state is None:
+        battle_state = BattleState()
+    
+    # Update animation time
+    battle_animation_time += 0.1
+    
+    # Fill background with dark sea color
+    screen.fill((0, 45, 98))
+    
+    # Draw animated waves
+    wave_height = HEIGHT * 0.85
+    for i in range(WIDTH):
+        x = i
+        y = wave_height + math.sin(battle_animation_time * 0.05 + i * 0.02) * 20
+        pygame.draw.line(screen, WAVE_COLOR, (x, y), (x, HEIGHT))
+    
+    # Draw battle state specific elements
+    if battle_state.state == BATTLE_STATE_INTRO:
+        # Draw emerging monster animation
+        emerge_progress = min(1.0, battle_state.intro_timer / 180)
+        monster_y = HEIGHT - (HEIGHT - battle_state.monster_y) * emerge_progress
+        
+        # Draw monster (octopus)
+        draw_octopus(battle_state.monster_x, monster_y, battle_state.monster_size)
+        
+        # Draw intro text with enhanced readability
+        # Create text background
+        text = title_font.render("Inner Voice Monster Appears!", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//3))
+        
+        # Draw text background
+        bg_rect = text_rect.copy()
+        bg_rect.inflate_ip(20, 10)
+        pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+        
+        # Draw text with glow
+        glow_surface = pygame.Surface(text.get_size(), pygame.SRCALPHA)
+        glow_color = (255, 255, 255, 50)
+        glow_text = title_font.render("Inner Voice Monster Appears!", True, glow_color)
+        for offset in range(0, 10, 2):
+            screen.blit(glow_text, (text_rect.x - offset, text_rect.y))
+            screen.blit(glow_text, (text_rect.x + offset, text_rect.y))
+        screen.blit(text, text_rect)
+    
+    elif battle_state.state == BATTLE_STATE_FIGHTING:
+        # Draw monster if visible
+        if battle_state.monster_visible:
+            draw_octopus(battle_state.monster_x, battle_state.monster_y, 
+                        battle_state.monster_size)
+            
+            # Show "Critical Thoughts Attack" with enhanced readability
+            if len(battle_state.rocks) > 0:
+                attack_text = game_font.render("Critical Thoughts Attack!", True, (255, 0, 0))
+                text_rect = attack_text.get_rect(centerx=WIDTH//2, y=50)
+                
+                # Draw text background
+                bg_rect = text_rect.copy()
+                bg_rect.inflate_ip(20, 10)
+                pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+                
+                # Add glow effect
+                glow_surface = pygame.Surface(attack_text.get_size(), pygame.SRCALPHA)
+                for i in range(10):
+                    alpha = int(150 * (1 - i/10))  # Increased alpha for better visibility
+                    color = (255, 0, 0, alpha)
+                    glow_text = game_font.render("Critical Thoughts Attack!", True, color)
+                    screen.blit(glow_text, (text_rect.x - i, text_rect.y))
+                screen.blit(attack_text, text_rect)
+        
+        # Draw rocks with enhanced effects
+        for rock in battle_state.rocks:
+            rock.draw(screen)
+        
+        # Draw flowers
+        for flower in battle_state.flowers:
+            flower.draw(screen)
+            # Show "Compassion Attack" with enhanced readability
+            if len(battle_state.flowers) > 0:
+                attack_text = game_font.render("Compassion Attack!", True, (255, 192, 203))
+                text_rect = attack_text.get_rect(centerx=WIDTH//2, bottom=HEIGHT-50)
+                
+                # Draw text background
+                bg_rect = text_rect.copy()
+                bg_rect.inflate_ip(20, 10)
+                pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+                
+                # Add glow effect
+                glow_surface = pygame.Surface(attack_text.get_size(), pygame.SRCALPHA)
+                for i in range(10):
+                    alpha = int(150 * (1 - i/10))  # Increased alpha for better visibility
+                    color = (255, 192, 203, alpha)
+                    glow_text = game_font.render("Compassion Attack!", True, color)
+                    screen.blit(glow_text, (text_rect.x - i, text_rect.y))
+                screen.blit(attack_text, text_rect)
+        
+        # Draw boat with wave effect
+        boat_y_offset = math.sin(battle_animation_time * 2) * 5
+        rotated_boat = pygame.transform.rotate(boat_image, 
+                                            math.sin(battle_animation_time) * 5)
+        boat_rect = rotated_boat.get_rect(center=(battle_state.boat_x, 
+                                                 battle_state.boat_y + boat_y_offset))
+        screen.blit(rotated_boat, boat_rect)
+        
+        # Draw health bars
+        draw_battle_ui(battle_state)
+    
+    elif battle_state.state == BATTLE_STATE_WIN:
+        text = title_font.render("You defeated the Inner Voice Monster!", True, GOLD)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        screen.blit(text, text_rect)
+        
+        text = game_font.render("Press ESC to continue your journey", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2 + 60))
+        screen.blit(text, text_rect)
+        
+        # Set game as won
+        game_state = GAME_STATE_WINNER
+    
+    elif battle_state.state == BATTLE_STATE_LOSE:
+        text = title_font.render("The Monster overwhelmed you...", True, RED)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        screen.blit(text, text_rect)
+        
+        text = game_font.render("Press ESC to return to your journey", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2 + 60))
+        screen.blit(text, text_rect)
+        
+        # Reset player's cards
+        player_card_counts[current_player] = {'reflection': 0, 'coping': 0}
+        collected_cards[current_player] = {'reflection': [], 'coping': []}
+
+def draw_octopus(x, y, size):
+    """Draw the octopus monster with enhanced graphics"""
+    # Draw glowing effect
+    glow_radius = size * 0.6 + math.sin(battle_animation_time * 0.1) * 10
+    glow_surface = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
+    for r in range(int(glow_radius), 0, -2):
+        alpha = int(100 * (r / glow_radius))
+        pygame.draw.circle(glow_surface, (128, 0, 128, alpha), 
+                         (glow_radius, glow_radius), r)
+    screen.blit(glow_surface, (x - glow_radius, y - glow_radius))
+
+    # Draw tentacles with gradient and wave effect
+    for i in range(8):  # Increased number of tentacles
+        angle = i * 45 + math.sin(battle_animation_time * 0.1) * 20
+        length = size * 1.2  # Longer tentacles
+        
+        # Create multiple segments for each tentacle
+        points = []
+        segments = 8  # More segments for smoother tentacles
+        for j in range(segments + 1):
+            progress = j / segments
+            segment_length = length * progress
+            wave_offset = math.sin(battle_animation_time * 0.2 + progress * 4) * (size * 0.2)
+            
+            segment_x = x + math.cos(math.radians(angle)) * segment_length
+            segment_y = y + math.sin(math.radians(angle)) * segment_length
+            
+            # Add wave motion
+            segment_x += math.cos(math.radians(angle + 90)) * wave_offset
+            segment_y += math.sin(math.radians(angle + 90)) * wave_offset
+            
+            points.append((segment_x, segment_y))
+        
+        # Draw tentacle with gradient
+        if len(points) >= 2:
+            for k in range(len(points) - 1):
+                progress = k / (len(points) - 1)
+                thickness = int((1 - progress) * size * 0.2)
+                color = (
+                    128 + int(progress * 40),
+                    0,
+                    128 + int(progress * 40),
+                )
+                pygame.draw.line(screen, color, points[k], points[k + 1], thickness)
+
+    # Draw body with gradient
+    body_radius = int(size * 0.5)
+    body_surface = pygame.Surface((body_radius * 2, body_radius * 2), pygame.SRCALPHA)
+    for r in range(body_radius, 0, -1):
+        progress = r / body_radius
+        color = (
+            128 + int((1 - progress) * 40),
+            0,
+            128 + int((1 - progress) * 40),
+            255
+        )
+        pygame.draw.circle(body_surface, color, (body_radius, body_radius), r)
+    screen.blit(body_surface, (x - body_radius, y - body_radius))
+
+    # Draw eyes with glow
+    eye_size = size * 0.15
+    eye_offset = size * 0.2
+    
+    # Draw eye glow
+    for eye_x in [x - eye_offset, x + eye_offset]:
+        glow_size = eye_size * 1.5
+        eye_glow = pygame.Surface((int(glow_size * 2), int(glow_size * 2)), pygame.SRCALPHA)
+        for r in range(int(glow_size), 0, -1):
+            alpha = int(100 * (r / glow_size))
+            pygame.draw.circle(eye_glow, (255, 0, 0, alpha), 
+                             (glow_size, glow_size), r)
+        screen.blit(eye_glow, (eye_x - glow_size, y - glow_size))
+    
+    # Draw main eyes
+    for eye_x in [x - eye_offset, x + eye_offset]:
+        pygame.draw.circle(screen, (255, 255, 255), (int(eye_x), int(y)), int(eye_size))
+        pygame.draw.circle(screen, (255, 0, 0), (int(eye_x), int(y)), int(eye_size * 0.6))
+        pygame.draw.circle(screen, (0, 0, 0), (int(eye_x), int(y)), int(eye_size * 0.3))
+        # Add highlight
+        pygame.draw.circle(screen, (255, 255, 255), 
+                         (int(eye_x - eye_size * 0.2), int(y - eye_size * 0.2)), 
+                         int(eye_size * 0.1))
+
+def draw_battle_ui(battle_state):
+    """Draw the battle UI including health bars and instructions"""
+    # Draw boat health
+    health_width = 200
+    health_height = 20
+    health_x = 20
+    health_y = 20
+    
+    pygame.draw.rect(screen, (64, 64, 64), (health_x, health_y, health_width, health_height))
+    health_percent = battle_state.boat_health / BOAT_STARTING_HEALTH
+    pygame.draw.rect(screen, (0, 255, 0), 
+                    (health_x, health_y, health_width * health_percent, health_height))
+    
+    # Draw monster health
+    monster_health_x = WIDTH - health_width - 20
+    pygame.draw.rect(screen, (64, 64, 64), 
+                    (monster_health_x, health_y, health_width, health_height))
+    monster_health_percent = battle_state.monster_health / MONSTER_HITS_TO_WIN
+    pygame.draw.rect(screen, (255, 0, 0), 
+                    (monster_health_x, health_y, health_width * monster_health_percent, 
+                     health_height))
+    
+    # Draw instructions
+    instructions = [
+        "← → : Move boat",
+        "SPACE : Launch compassion flower",
+        "ESC : Retreat"
+    ]
+    
+    y = HEIGHT - 100
+    for instruction in instructions:
+        text = instruction_font.render(instruction, True, WHITE)
+        text_rect = text.get_rect(left=20, top=y)
+        screen.blit(text, text_rect)
+        y += 25
+
+# Initialize battle button
+battle_button = BattleButton()
+
+# Start background music when game starts
+if background_music is not None:
+    background_music.play(-1)
+
+async def main():
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Sea Journey - Inner Voice Battle")
+    
+    # Initialize game state variables
+    game_state = GAME_STATE_MENU
+    running = True
+    battle_button = BattleButton()
+    
+    # Start background music when game starts
+    if background_music is not None:
+        background_music.play(-1)
+    
+    while running:
+        # Store the close button rect for click detection
+        close_button_rect = None
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    # Get the current close button rect
+                    close_button_rect = draw_close_button()
+                    if close_button_rect and close_button_rect.collidepoint(event.pos):
+                        running = False
+                        pygame.quit()
+                        sys.exit()
+                    
+                    # Handle battle button click
+                    if game_state == GAME_STATE_PLAYING and battle_button.rect.collidepoint(event.pos):
+                        game_state = GAME_STATE_BATTLE
+                        battle_messages = ["The battle begins!",
+                                        f"You have {player_card_counts[current_player]['reflection']} reflection cards",
+                                        f"and {player_card_counts[current_player]['coping']} coping cards"]
+                    
+                    # Handle card selection in exchange state
+                    if EXCHANGE_STATE == 'selecting' and isinstance(centered_card, ExchangeInterface):
+                        for i, card in enumerate(centered_card.cards):
+                            if card['rect'].collidepoint(event.pos):
+                                centered_card.selected_index = i
+                                break
+            
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_m:  # Add music toggle with 'M' key
+                    toggle_music()
+                
+                if game_state == GAME_STATE_MENU:
+                    if event.key == pygame.K_1:
+                        play_sound(collect_card_sound)
+                        num_players = 1
+                        game_state = GAME_STATE_PLAYING
+                    elif event.key == pygame.K_2:
+                        play_sound(collect_card_sound)
+                        num_players = 2
+                        game_state = GAME_STATE_PLAYING
+                
+                elif game_state == GAME_STATE_PLAYING and event.key == pygame.K_SPACE:
+                    if waiting_for_card_interaction or EXCHANGE_STATE == 'moving':
+                        handle_card_interaction(event)
+                    elif can_roll:
+                        play_sound(dice_roll_sound)
+                        current_roll = roll_dice()
+                        can_roll = False
+                        waiting_for_card_interaction, card_type = move_boat(current_roll)
+                        
+                        if check_boats_meeting():
+                            waiting_for_card_interaction = True
+                            EXCHANGE_STATE = 'selecting'
+                            centered_card = ExchangeInterface(player_card_counts)
+                        elif waiting_for_card_interaction and current_card_symbol:
+                            centered_card = CenteredCard(current_card_symbol, card_type)
+                        else:
+                            can_roll = True
+                
+                elif game_state == GAME_STATE_BATTLE:
+                    if event.key == pygame.K_ESCAPE:
+                        game_state = GAME_STATE_PLAYING
+                        battle_state = None
+                    elif event.key == pygame.K_SPACE and battle_state and battle_state.state == BATTLE_STATE_FIGHTING:
+                        # Launch compassion flower
+                        battle_state.flowers.append(CompassionFlower(battle_state.boat_x, battle_state.boat_y - boat_size//2))
+        
+        # Draw current game state
+        if game_state == GAME_STATE_MENU:
+            draw_menu()
+        elif game_state == GAME_STATE_BATTLE:
+            if battle_state:
+                battle_state.update()
+            draw_battle_screen()
+        else:
+            draw_game_state()
+            battle_button.update(pygame.mouse.get_pos())
+            battle_button.draw(screen)
+            
+            if waiting_for_card_interaction and centered_card:
+                centered_card.update()
+                centered_card.draw(screen)
+            
+            # Update and draw card animations
+            if animation_cards:
+                for card in animation_cards[:]:
+                    card.update()
+                    card.draw(screen, pygame.font.Font(None, 20))
+                    if not card.moving:
+                        animation_cards.remove(card)
+        
+        # Always draw the close button last so it's on top
+        close_button_rect = draw_close_button()
+        pygame.display.flip()
+        await asyncio.sleep(0)  # Required for web compatibility
+    
+    pygame.quit()
+    if background_music is not None:
+        background_music.stop()
+    mixer.quit()
+
+# Initialize battle state
+battle_state = None
+battle_animation_time = 0
+battle_result = None
+battle_messages = []
+BATTLE_STATE_INTRO = 'intro'
+BATTLE_STATE_FIGHTING = 'fighting'
+BATTLE_STATE_WIN = 'win'
+BATTLE_STATE_LOSE = 'lose'
+BOAT_BATTLE_SPEED = 5
+ROCK_SPEED = 4
+FLOWER_SPEED = 7
+MONSTER_HITS_TO_WIN = 20  # Increased from 10 to 20 hits
+BOAT_STARTING_HEALTH = 3
+
+class BattleState:
+    def __init__(self):
+        self.state = BATTLE_STATE_INTRO
+        self.boat_x = WIDTH * 0.2
+        self.boat_y = HEIGHT * 0.8
+        self.monster_x = WIDTH * 0.8
+        self.monster_y = HEIGHT * 0.3
+        self.monster_size = 200
+        self.monster_health = MONSTER_HITS_TO_WIN
+        self.boat_health = BOAT_STARTING_HEALTH
+        self.rocks = []
+        self.flowers = []
+        self.rock_spawn_timer = 0
+        self.monster_move_timer = 0
+        self.intro_timer = 0
+        self.monster_visible = True
+        self.monster_moving = False
+        self.monster_target_x = self.monster_x
+        self.boat_rect = pygame.Rect(self.boat_x - boat_size//2, 
+                                   self.boat_y - boat_size//2, 
+                                   boat_size, boat_size)
+        self.monster_rect = pygame.Rect(self.monster_x - self.monster_size//2, 
+                                      self.monster_y - self.monster_size//2,
+                                      self.monster_size, self.monster_size)
+
+    def update(self):
+        if self.state == BATTLE_STATE_INTRO:
+            self.intro_timer += 1
+            if self.intro_timer > 180:  # 3 seconds at 60 FPS
+                self.state = BATTLE_STATE_FIGHTING
+        
+        elif self.state == BATTLE_STATE_FIGHTING:
+            # Update boat position based on keyboard input
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT]:
+                self.boat_x = max(boat_size//2, self.boat_x - BOAT_BATTLE_SPEED)
+            if keys[pygame.K_RIGHT]:
+                self.boat_x = min(WIDTH - boat_size//2, self.boat_x + BOAT_BATTLE_SPEED)
+            
+            # Update boat rect
+            self.boat_rect.x = self.boat_x - boat_size//2
+            self.boat_rect.y = self.boat_y - boat_size//2
+            
+            # Monster movement
+            if not self.monster_moving and random.random() < 0.02:  # 2% chance to start moving
+                self.monster_moving = True
+                self.monster_visible = False
+                self.monster_target_x = random.randint(int(WIDTH * 0.6), int(WIDTH * 0.9))
+                self.monster_y = HEIGHT * 0.3  # Reset height when moving
+            
+            if self.monster_moving:
+                self.monster_move_timer += 1
+                if self.monster_move_timer > 60:  # Show monster after 1 second
+                    self.monster_visible = True
+                    # Move towards target
+                    dx = self.monster_target_x - self.monster_x
+                    if abs(dx) < 2:
+                        self.monster_moving = False
+                        self.monster_move_timer = 0
+                    else:
+                        self.monster_x += dx * 0.1
+            
+            # Update monster rect
+            self.monster_rect.x = self.monster_x - self.monster_size//2
+            self.monster_rect.y = self.monster_y - self.monster_size//2
+            
+            # Spawn rocks with increasing frequency as monster gets smaller
+            spawn_rate = max(15, 45 - (MONSTER_HITS_TO_WIN - self.monster_health))  # More aggressive scaling
+            self.rock_spawn_timer += 1
+            if self.rock_spawn_timer > spawn_rate and self.monster_visible:
+                self.rock_spawn_timer = 0
+                num_rocks = min(5, 2 + (MONSTER_HITS_TO_WIN - self.monster_health) // 4)  # Increase rocks based on damage
+                for _ in range(num_rocks):  # Spawn multiple rocks
+                    rock_x = self.monster_x + random.randint(-50, 50)
+                    self.rocks.append(Rock(rock_x, self.monster_y + self.monster_size//2))
+            
+            # Update and check rocks
+            for rock in self.rocks[:]:
+                rock.update()
+                if rock.y > HEIGHT:
+                    self.rocks.remove(rock)
+                elif rock.rect.colliderect(self.boat_rect):
+                    self.rocks.remove(rock)
+                    self.boat_health -= 1
+                    if self.boat_health <= 0:
+                        self.state = BATTLE_STATE_LOSE
+            
+            # Update and check flowers
+            for flower in self.flowers[:]:
+                flower.update()
+                if flower.y < 0:
+                    self.flowers.remove(flower)
+                elif self.monster_visible and flower.rect.colliderect(self.monster_rect):
+                    self.flowers.remove(flower)
+                    self.monster_health -= 1
+                    # Make monster smaller but increase attack frequency
+                    self.monster_size = max(40, 200 - (MONSTER_HITS_TO_WIN - self.monster_health) * 8)
+                    if self.monster_health <= 0:
+                        self.state = BATTLE_STATE_WIN
+
+class Rock:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 30
+        self.height = 30
+        self.speed = ROCK_SPEED
+        self.rect = pygame.Rect(x, y, self.width, self.height)
+    
+    def update(self):
+        self.y += self.speed
+        self.rect.y = self.y
+    
+    def draw(self, screen):
+        pygame.draw.circle(screen, (139, 69, 19), 
+                         (self.x + self.width//2, self.y + self.height//2), 
+                         self.width//2)
+
+class CompassionFlower:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 20
+        self.height = 20
+        self.speed = FLOWER_SPEED
+        self.rect = pygame.Rect(x, y, self.width, self.height)
+    
+    def update(self):
+        self.y -= self.speed
+        self.rect.y = self.y
+    
+    def draw(self, screen):
+        # Draw flower petals
+        petal_color = (255, 192, 203)  # Pink
+        center_color = (255, 255, 0)   # Yellow
+        center = (self.x + self.width//2, self.y + self.height//2)
+        
+        for i in range(6):
+            angle = i * 60
+            x = center[0] + math.cos(math.radians(angle)) * 8
+            y = center[1] + math.sin(math.radians(angle)) * 8
+            pygame.draw.circle(screen, petal_color, (int(x), int(y)), 6)
+        
+        # Draw flower center
+        pygame.draw.circle(screen, center_color, center, 5)
+
+class BattleButton:
+    def __init__(self):
+        self.width = 200
+        self.height = 50
+        self.x = 20  # Changed from right side to left side
+        self.y = HEIGHT - self.height - 20  # Keep at bottom
+        self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        self.color = (220, 20, 60)  # Crimson red
+        self.hover_color = (240, 128, 128)  # Light coral
+        self.is_hovered = False
+        self.text = "Inner Voice Monster"
+        
+    def update(self, mouse_pos):
+        self.is_hovered = self.rect.collidepoint(mouse_pos)
+        
+    def draw(self, screen):
+        color = self.hover_color if self.is_hovered else self.color
+        
+        # Draw button with gradient and glow effect
+        if self.is_hovered:
+            # Draw glow
+            glow_surface = pygame.Surface((self.width + 10, self.height + 10), pygame.SRCALPHA)
+            pygame.draw.rect(glow_surface, (*color[:3], 100), 
+                           (0, 0, self.width + 10, self.height + 10), border_radius=15)
+            screen.blit(glow_surface, (self.x - 5, self.y - 5))
+        
+        # Draw button background with gradient
+        gradient_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        for i in range(self.height):
+            progress = i / self.height
+            current_color = (
+                int(color[0] + (255 - color[0]) * progress * 0.5),
+                int(color[1] + (255 - color[1]) * progress * 0.5),
+                int(color[2] + (255 - color[2]) * progress * 0.5)
+            )
+            pygame.draw.line(gradient_surface, current_color, (0, i), (self.width, i))
+        
+        # Apply gradient to button
+        button_rect = pygame.Rect(0, 0, self.width, self.height)
+        pygame.draw.rect(gradient_surface, color, button_rect, border_radius=10)
+        screen.blit(gradient_surface, (self.x, self.y))
+        
+        # Draw border
+        pygame.draw.rect(screen, BLACK, self.rect, 2, border_radius=10)
+        
+        # Draw text with shadow
+        text_surface = game_font.render(self.text, True, WHITE)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        
+        # Draw shadow
+        shadow_surface = game_font.render(self.text, True, (0, 0, 0, 100))
+        shadow_rect = text_rect.copy()
+        shadow_rect.x += 2
+        shadow_rect.y += 2
+        screen.blit(shadow_surface, shadow_rect)
+        
+        # Draw main text
+        screen.blit(text_surface, text_rect)
+
+def draw_battle_screen():
+    """Draw the battle screen with the octopus monster and battle mechanics"""
+    global battle_state, game_state, player_card_counts, current_player, battle_animation_time
+    
+    if battle_state is None:
+        battle_state = BattleState()
+    
+    # Update animation time
+    battle_animation_time += 0.1
+    
+    # Fill background with dark sea color
+    screen.fill((0, 45, 98))
+    
+    # Draw animated waves
+    wave_height = HEIGHT * 0.85
+    for i in range(WIDTH):
+        x = i
+        y = wave_height + math.sin(battle_animation_time * 0.05 + i * 0.02) * 20
+        pygame.draw.line(screen, WAVE_COLOR, (x, y), (x, HEIGHT))
+    
+    # Draw battle state specific elements
+    if battle_state.state == BATTLE_STATE_INTRO:
+        # Draw emerging monster animation
+        emerge_progress = min(1.0, battle_state.intro_timer / 180)
+        monster_y = HEIGHT - (HEIGHT - battle_state.monster_y) * emerge_progress
+        
+        # Draw monster (octopus)
+        draw_octopus(battle_state.monster_x, monster_y, battle_state.monster_size)
+        
+        # Draw intro text with enhanced readability
+        # Create text background
+        text = title_font.render("Inner Voice Monster Appears!", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//3))
+        
+        # Draw text background
+        bg_rect = text_rect.copy()
+        bg_rect.inflate_ip(20, 10)
+        pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+        
+        # Draw text with glow
+        glow_surface = pygame.Surface(text.get_size(), pygame.SRCALPHA)
+        glow_color = (255, 255, 255, 50)
+        glow_text = title_font.render("Inner Voice Monster Appears!", True, glow_color)
+        for offset in range(0, 10, 2):
+            screen.blit(glow_text, (text_rect.x - offset, text_rect.y))
+            screen.blit(glow_text, (text_rect.x + offset, text_rect.y))
+        screen.blit(text, text_rect)
+    
+    elif battle_state.state == BATTLE_STATE_FIGHTING:
+        # Draw monster if visible
+        if battle_state.monster_visible:
+            draw_octopus(battle_state.monster_x, battle_state.monster_y, 
+                        battle_state.monster_size)
+            
+            # Show "Critical Thoughts Attack" with enhanced readability
+            if len(battle_state.rocks) > 0:
+                attack_text = game_font.render("Critical Thoughts Attack!", True, (255, 0, 0))
+                text_rect = attack_text.get_rect(centerx=WIDTH//2, y=50)
+                
+                # Draw text background
+                bg_rect = text_rect.copy()
+                bg_rect.inflate_ip(20, 10)
+                pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+                
+                # Add glow effect
+                glow_surface = pygame.Surface(attack_text.get_size(), pygame.SRCALPHA)
+                for i in range(10):
+                    alpha = int(150 * (1 - i/10))  # Increased alpha for better visibility
+                    color = (255, 0, 0, alpha)
+                    glow_text = game_font.render("Critical Thoughts Attack!", True, color)
+                    screen.blit(glow_text, (text_rect.x - i, text_rect.y))
+                screen.blit(attack_text, text_rect)
+        
+        # Draw rocks with enhanced effects
+        for rock in battle_state.rocks:
+            rock.draw(screen)
+        
+        # Draw flowers
+        for flower in battle_state.flowers:
+            flower.draw(screen)
+            # Show "Compassion Attack" with enhanced readability
+            if len(battle_state.flowers) > 0:
+                attack_text = game_font.render("Compassion Attack!", True, (255, 192, 203))
+                text_rect = attack_text.get_rect(centerx=WIDTH//2, bottom=HEIGHT-50)
+                
+                # Draw text background
+                bg_rect = text_rect.copy()
+                bg_rect.inflate_ip(20, 10)
+                pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+                
+                # Add glow effect
+                glow_surface = pygame.Surface(attack_text.get_size(), pygame.SRCALPHA)
+                for i in range(10):
+                    alpha = int(150 * (1 - i/10))  # Increased alpha for better visibility
+                    color = (255, 192, 203, alpha)
+                    glow_text = game_font.render("Compassion Attack!", True, color)
+                    screen.blit(glow_text, (text_rect.x - i, text_rect.y))
+                screen.blit(attack_text, text_rect)
+        
+        # Draw boat with wave effect
+        boat_y_offset = math.sin(battle_animation_time * 2) * 5
+        rotated_boat = pygame.transform.rotate(boat_image, 
+                                            math.sin(battle_animation_time) * 5)
+        boat_rect = rotated_boat.get_rect(center=(battle_state.boat_x, 
+                                                 battle_state.boat_y + boat_y_offset))
+        screen.blit(rotated_boat, boat_rect)
+        
+        # Draw health bars
+        draw_battle_ui(battle_state)
+    
+    elif battle_state.state == BATTLE_STATE_WIN:
+        text = title_font.render("You defeated the Inner Voice Monster!", True, GOLD)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        screen.blit(text, text_rect)
+        
+        text = game_font.render("Press ESC to continue your journey", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2 + 60))
+        screen.blit(text, text_rect)
+        
+        # Set game as won
+        game_state = GAME_STATE_WINNER
+    
+    elif battle_state.state == BATTLE_STATE_LOSE:
+        text = title_font.render("The Monster overwhelmed you...", True, RED)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        screen.blit(text, text_rect)
+        
+        text = game_font.render("Press ESC to return to your journey", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2 + 60))
+        screen.blit(text, text_rect)
+        
+        # Reset player's cards
+        player_card_counts[current_player] = {'reflection': 0, 'coping': 0}
+        collected_cards[current_player] = {'reflection': [], 'coping': []}
+
+def draw_octopus(x, y, size):
+    """Draw the octopus monster with enhanced graphics"""
+    # Draw glowing effect
+    glow_radius = size * 0.6 + math.sin(battle_animation_time * 0.1) * 10
+    glow_surface = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
+    for r in range(int(glow_radius), 0, -2):
+        alpha = int(100 * (r / glow_radius))
+        pygame.draw.circle(glow_surface, (128, 0, 128, alpha), 
+                         (glow_radius, glow_radius), r)
+    screen.blit(glow_surface, (x - glow_radius, y - glow_radius))
+
+    # Draw tentacles with gradient and wave effect
+    for i in range(8):  # Increased number of tentacles
+        angle = i * 45 + math.sin(battle_animation_time * 0.1) * 20
+        length = size * 1.2  # Longer tentacles
+        
+        # Create multiple segments for each tentacle
+        points = []
+        segments = 8  # More segments for smoother tentacles
+        for j in range(segments + 1):
+            progress = j / segments
+            segment_length = length * progress
+            wave_offset = math.sin(battle_animation_time * 0.2 + progress * 4) * (size * 0.2)
+            
+            segment_x = x + math.cos(math.radians(angle)) * segment_length
+            segment_y = y + math.sin(math.radians(angle)) * segment_length
+            
+            # Add wave motion
+            segment_x += math.cos(math.radians(angle + 90)) * wave_offset
+            segment_y += math.sin(math.radians(angle + 90)) * wave_offset
+            
+            points.append((segment_x, segment_y))
+        
+        # Draw tentacle with gradient
+        if len(points) >= 2:
+            for k in range(len(points) - 1):
+                progress = k / (len(points) - 1)
+                thickness = int((1 - progress) * size * 0.2)
+                color = (
+                    128 + int(progress * 40),
+                    0,
+                    128 + int(progress * 40),
+                )
+                pygame.draw.line(screen, color, points[k], points[k + 1], thickness)
+
+    # Draw body with gradient
+    body_radius = int(size * 0.5)
+    body_surface = pygame.Surface((body_radius * 2, body_radius * 2), pygame.SRCALPHA)
+    for r in range(body_radius, 0, -1):
+        progress = r / body_radius
+        color = (
+            128 + int((1 - progress) * 40),
+            0,
+            128 + int((1 - progress) * 40),
+            255
+        )
+        pygame.draw.circle(body_surface, color, (body_radius, body_radius), r)
+    screen.blit(body_surface, (x - body_radius, y - body_radius))
+
+    # Draw eyes with glow
+    eye_size = size * 0.15
+    eye_offset = size * 0.2
+    
+    # Draw eye glow
+    for eye_x in [x - eye_offset, x + eye_offset]:
+        glow_size = eye_size * 1.5
+        eye_glow = pygame.Surface((int(glow_size * 2), int(glow_size * 2)), pygame.SRCALPHA)
+        for r in range(int(glow_size), 0, -1):
+            alpha = int(100 * (r / glow_size))
+            pygame.draw.circle(eye_glow, (255, 0, 0, alpha), 
+                             (glow_size, glow_size), r)
+        screen.blit(eye_glow, (eye_x - glow_size, y - glow_size))
+    
+    # Draw main eyes
+    for eye_x in [x - eye_offset, x + eye_offset]:
+        pygame.draw.circle(screen, (255, 255, 255), (int(eye_x), int(y)), int(eye_size))
+        pygame.draw.circle(screen, (255, 0, 0), (int(eye_x), int(y)), int(eye_size * 0.6))
+        pygame.draw.circle(screen, (0, 0, 0), (int(eye_x), int(y)), int(eye_size * 0.3))
+        # Add highlight
+        pygame.draw.circle(screen, (255, 255, 255), 
+                         (int(eye_x - eye_size * 0.2), int(y - eye_size * 0.2)), 
+                         int(eye_size * 0.1))
+
+def draw_battle_ui(battle_state):
+    """Draw the battle UI including health bars and instructions"""
+    # Draw boat health
+    health_width = 200
+    health_height = 20
+    health_x = 20
+    health_y = 20
+    
+    pygame.draw.rect(screen, (64, 64, 64), (health_x, health_y, health_width, health_height))
+    health_percent = battle_state.boat_health / BOAT_STARTING_HEALTH
+    pygame.draw.rect(screen, (0, 255, 0), 
+                    (health_x, health_y, health_width * health_percent, health_height))
+    
+    # Draw monster health
+    monster_health_x = WIDTH - health_width - 20
+    pygame.draw.rect(screen, (64, 64, 64), 
+                    (monster_health_x, health_y, health_width, health_height))
+    monster_health_percent = battle_state.monster_health / MONSTER_HITS_TO_WIN
+    pygame.draw.rect(screen, (255, 0, 0), 
+                    (monster_health_x, health_y, health_width * monster_health_percent, 
+                     health_height))
+    
+    # Draw instructions
+    instructions = [
+        "← → : Move boat",
+        "SPACE : Launch compassion flower",
+        "ESC : Retreat"
+    ]
+    
+    y = HEIGHT - 100
+    for instruction in instructions:
+        text = instruction_font.render(instruction, True, WHITE)
+        text_rect = text.get_rect(left=20, top=y)
+        screen.blit(text, text_rect)
+        y += 25
+
+# Initialize battle button
+battle_button = BattleButton()
+
+# Start background music when game starts
+if background_music is not None:
+    background_music.play(-1)
+
+async def main():
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Sea Journey - Inner Voice Battle")
+    
+    # Initialize game state variables
+    game_state = GAME_STATE_MENU
+    running = True
+    battle_button = BattleButton()
+    
+    # Start background music when game starts
+    if background_music is not None:
+        background_music.play(-1)
+    
+    while running:
+        # Store the close button rect for click detection
+        close_button_rect = None
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    # Get the current close button rect
+                    close_button_rect = draw_close_button()
+                    if close_button_rect and close_button_rect.collidepoint(event.pos):
+                        running = False
+                        pygame.quit()
+                        sys.exit()
+                    
+                    # Handle battle button click
+                    if game_state == GAME_STATE_PLAYING and battle_button.rect.collidepoint(event.pos):
+                        game_state = GAME_STATE_BATTLE
+                        battle_messages = ["The battle begins!",
+                                        f"You have {player_card_counts[current_player]['reflection']} reflection cards",
+                                        f"and {player_card_counts[current_player]['coping']} coping cards"]
+                    
+                    # Handle card selection in exchange state
+                    if EXCHANGE_STATE == 'selecting' and isinstance(centered_card, ExchangeInterface):
+                        for i, card in enumerate(centered_card.cards):
+                            if card['rect'].collidepoint(event.pos):
+                                centered_card.selected_index = i
+                                break
+            
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_m:  # Add music toggle with 'M' key
+                    toggle_music()
+                
+                if game_state == GAME_STATE_MENU:
+                    if event.key == pygame.K_1:
+                        play_sound(collect_card_sound)
+                        num_players = 1
+                        game_state = GAME_STATE_PLAYING
+                    elif event.key == pygame.K_2:
+                        play_sound(collect_card_sound)
+                        num_players = 2
+                        game_state = GAME_STATE_PLAYING
+                
+                elif game_state == GAME_STATE_PLAYING and event.key == pygame.K_SPACE:
+                    if waiting_for_card_interaction or EXCHANGE_STATE == 'moving':
+                        handle_card_interaction(event)
+                    elif can_roll:
+                        play_sound(dice_roll_sound)
+                        current_roll = roll_dice()
+                        can_roll = False
+                        waiting_for_card_interaction, card_type = move_boat(current_roll)
+                        
+                        if check_boats_meeting():
+                            waiting_for_card_interaction = True
+                            EXCHANGE_STATE = 'selecting'
+                            centered_card = ExchangeInterface(player_card_counts)
+                        elif waiting_for_card_interaction and current_card_symbol:
+                            centered_card = CenteredCard(current_card_symbol, card_type)
+                        else:
+                            can_roll = True
+                
+                elif game_state == GAME_STATE_BATTLE:
+                    if event.key == pygame.K_ESCAPE:
+                        game_state = GAME_STATE_PLAYING
+                        battle_state = None
+                    elif event.key == pygame.K_SPACE and battle_state and battle_state.state == BATTLE_STATE_FIGHTING:
+                        # Launch compassion flower
+                        battle_state.flowers.append(CompassionFlower(battle_state.boat_x, battle_state.boat_y - boat_size//2))
+        
+        # Draw current game state
+        if game_state == GAME_STATE_MENU:
+            draw_menu()
+        elif game_state == GAME_STATE_BATTLE:
+            if battle_state:
+                battle_state.update()
+            draw_battle_screen()
+        else:
+            draw_game_state()
+            battle_button.update(pygame.mouse.get_pos())
+            battle_button.draw(screen)
+            
+            if waiting_for_card_interaction and centered_card:
+                centered_card.update()
+                centered_card.draw(screen)
+            
+            # Update and draw card animations
+            if animation_cards:
+                for card in animation_cards[:]:
+                    card.update()
+                    card.draw(screen, pygame.font.Font(None, 20))
+                    if not card.moving:
+                        animation_cards.remove(card)
+        
+        # Always draw the close button last so it's on top
+        close_button_rect = draw_close_button()
+        pygame.display.flip()
+        await asyncio.sleep(0)  # Required for web compatibility
+    
+    pygame.quit()
+    if background_music is not None:
+        background_music.stop()
+    mixer.quit()
+
+# Initialize battle state
+battle_state = None
+battle_animation_time = 0
+battle_result = None
+battle_messages = []
+BATTLE_STATE_INTRO = 'intro'
+BATTLE_STATE_FIGHTING = 'fighting'
+BATTLE_STATE_WIN = 'win'
+BATTLE_STATE_LOSE = 'lose'
+BOAT_BATTLE_SPEED = 5
+ROCK_SPEED = 4
+FLOWER_SPEED = 7
+MONSTER_HITS_TO_WIN = 20  # Increased from 10 to 20 hits
+BOAT_STARTING_HEALTH = 3
+
+class BattleState:
+    def __init__(self):
+        self.state = BATTLE_STATE_INTRO
+        self.boat_x = WIDTH * 0.2
+        self.boat_y = HEIGHT * 0.8
+        self.monster_x = WIDTH * 0.8
+        self.monster_y = HEIGHT * 0.3
+        self.monster_size = 200
+        self.monster_health = MONSTER_HITS_TO_WIN
+        self.boat_health = BOAT_STARTING_HEALTH
+        self.rocks = []
+        self.flowers = []
+        self.rock_spawn_timer = 0
+        self.monster_move_timer = 0
+        self.intro_timer = 0
+        self.monster_visible = True
+        self.monster_moving = False
+        self.monster_target_x = self.monster_x
+        self.boat_rect = pygame.Rect(self.boat_x - boat_size//2, 
+                                   self.boat_y - boat_size//2, 
+                                   boat_size, boat_size)
+        self.monster_rect = pygame.Rect(self.monster_x - self.monster_size//2, 
+                                      self.monster_y - self.monster_size//2,
+                                      self.monster_size, self.monster_size)
+
+    def update(self):
+        if self.state == BATTLE_STATE_INTRO:
+            self.intro_timer += 1
+            if self.intro_timer > 180:  # 3 seconds at 60 FPS
+                self.state = BATTLE_STATE_FIGHTING
+        
+        elif self.state == BATTLE_STATE_FIGHTING:
+            # Update boat position based on keyboard input
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT]:
+                self.boat_x = max(boat_size//2, self.boat_x - BOAT_BATTLE_SPEED)
+            if keys[pygame.K_RIGHT]:
+                self.boat_x = min(WIDTH - boat_size//2, self.boat_x + BOAT_BATTLE_SPEED)
+            
+            # Update boat rect
+            self.boat_rect.x = self.boat_x - boat_size//2
+            self.boat_rect.y = self.boat_y - boat_size//2
+            
+            # Monster movement
+            if not self.monster_moving and random.random() < 0.02:  # 2% chance to start moving
+                self.monster_moving = True
+                self.monster_visible = False
+                self.monster_target_x = random.randint(int(WIDTH * 0.6), int(WIDTH * 0.9))
+                self.monster_y = HEIGHT * 0.3  # Reset height when moving
+            
+            if self.monster_moving:
+                self.monster_move_timer += 1
+                if self.monster_move_timer > 60:  # Show monster after 1 second
+                    self.monster_visible = True
+                    # Move towards target
+                    dx = self.monster_target_x - self.monster_x
+                    if abs(dx) < 2:
+                        self.monster_moving = False
+                        self.monster_move_timer = 0
+                    else:
+                        self.monster_x += dx * 0.1
+            
+            # Update monster rect
+            self.monster_rect.x = self.monster_x - self.monster_size//2
+            self.monster_rect.y = self.monster_y - self.monster_size//2
+            
+            # Spawn rocks with increasing frequency as monster gets smaller
+            spawn_rate = max(15, 45 - (MONSTER_HITS_TO_WIN - self.monster_health))  # More aggressive scaling
+            self.rock_spawn_timer += 1
+            if self.rock_spawn_timer > spawn_rate and self.monster_visible:
+                self.rock_spawn_timer = 0
+                num_rocks = min(5, 2 + (MONSTER_HITS_TO_WIN - self.monster_health) // 4)  # Increase rocks based on damage
+                for _ in range(num_rocks):  # Spawn multiple rocks
+                    rock_x = self.monster_x + random.randint(-50, 50)
+                    self.rocks.append(Rock(rock_x, self.monster_y + self.monster_size//2))
+            
+            # Update and check rocks
+            for rock in self.rocks[:]:
+                rock.update()
+                if rock.y > HEIGHT:
+                    self.rocks.remove(rock)
+                elif rock.rect.colliderect(self.boat_rect):
+                    self.rocks.remove(rock)
+                    self.boat_health -= 1
+                    if self.boat_health <= 0:
+                        self.state = BATTLE_STATE_LOSE
+            
+            # Update and check flowers
+            for flower in self.flowers[:]:
+                flower.update()
+                if flower.y < 0:
+                    self.flowers.remove(flower)
+                elif self.monster_visible and flower.rect.colliderect(self.monster_rect):
+                    self.flowers.remove(flower)
+                    self.monster_health -= 1
+                    # Make monster smaller but increase attack frequency
+                    self.monster_size = max(40, 200 - (MONSTER_HITS_TO_WIN - self.monster_health) * 8)
+                    if self.monster_health <= 0:
+                        self.state = BATTLE_STATE_WIN
+
+class Rock:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 30
+        self.height = 30
+        self.speed = ROCK_SPEED
+        self.rect = pygame.Rect(x, y, self.width, self.height)
+    
+    def update(self):
+        self.y += self.speed
+        self.rect.y = self.y
+    
+    def draw(self, screen):
+        pygame.draw.circle(screen, (139, 69, 19), 
+                         (self.x + self.width//2, self.y + self.height//2), 
+                         self.width//2)
+
+class CompassionFlower:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 20
+        self.height = 20
+        self.speed = FLOWER_SPEED
+        self.rect = pygame.Rect(x, y, self.width, self.height)
+    
+    def update(self):
+        self.y -= self.speed
+        self.rect.y = self.y
+    
+    def draw(self, screen):
+        # Draw flower petals
+        petal_color = (255, 192, 203)  # Pink
+        center_color = (255, 255, 0)   # Yellow
+        center = (self.x + self.width//2, self.y + self.height//2)
+        
+        for i in range(6):
+            angle = i * 60
+            x = center[0] + math.cos(math.radians(angle)) * 8
+            y = center[1] + math.sin(math.radians(angle)) * 8
+            pygame.draw.circle(screen, petal_color, (int(x), int(y)), 6)
+        
+        # Draw flower center
+        pygame.draw.circle(screen, center_color, center, 5)
+
+class BattleButton:
+    def __init__(self):
+        self.width = 200
+        self.height = 50
+        self.x = 20  # Changed from right side to left side
+        self.y = HEIGHT - self.height - 20  # Keep at bottom
+        self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        self.color = (220, 20, 60)  # Crimson red
+        self.hover_color = (240, 128, 128)  # Light coral
+        self.is_hovered = False
+        self.text = "Inner Voice Monster"
+        
+    def update(self, mouse_pos):
+        self.is_hovered = self.rect.collidepoint(mouse_pos)
+        
+    def draw(self, screen):
+        color = self.hover_color if self.is_hovered else self.color
+        
+        # Draw button with gradient and glow effect
+        if self.is_hovered:
+            # Draw glow
+            glow_surface = pygame.Surface((self.width + 10, self.height + 10), pygame.SRCALPHA)
+            pygame.draw.rect(glow_surface, (*color[:3], 100), 
+                           (0, 0, self.width + 10, self.height + 10), border_radius=15)
+            screen.blit(glow_surface, (self.x - 5, self.y - 5))
+        
+        # Draw button background with gradient
+        gradient_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        for i in range(self.height):
+            progress = i / self.height
+            current_color = (
+                int(color[0] + (255 - color[0]) * progress * 0.5),
+                int(color[1] + (255 - color[1]) * progress * 0.5),
+                int(color[2] + (255 - color[2]) * progress * 0.5)
+            )
+            pygame.draw.line(gradient_surface, current_color, (0, i), (self.width, i))
+        
+        # Apply gradient to button
+        button_rect = pygame.Rect(0, 0, self.width, self.height)
+        pygame.draw.rect(gradient_surface, color, button_rect, border_radius=10)
+        screen.blit(gradient_surface, (self.x, self.y))
+        
+        # Draw border
+        pygame.draw.rect(screen, BLACK, self.rect, 2, border_radius=10)
+        
+        # Draw text with shadow
+        text_surface = game_font.render(self.text, True, WHITE)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        
+        # Draw shadow
+        shadow_surface = game_font.render(self.text, True, (0, 0, 0, 100))
+        shadow_rect = text_rect.copy()
+        shadow_rect.x += 2
+        shadow_rect.y += 2
+        screen.blit(shadow_surface, shadow_rect)
+        
+        # Draw main text
+        screen.blit(text_surface, text_rect)
+
+def draw_battle_screen():
+    """Draw the battle screen with the octopus monster and battle mechanics"""
+    global battle_state, game_state, player_card_counts, current_player, battle_animation_time
+    
+    if battle_state is None:
+        battle_state = BattleState()
+    
+    # Update animation time
+    battle_animation_time += 0.1
+    
+    # Fill background with dark sea color
+    screen.fill((0, 45, 98))
+    
+    # Draw animated waves
+    wave_height = HEIGHT * 0.85
+    for i in range(WIDTH):
+        x = i
+        y = wave_height + math.sin(battle_animation_time * 0.05 + i * 0.02) * 20
+        pygame.draw.line(screen, WAVE_COLOR, (x, y), (x, HEIGHT))
+    
+    # Draw battle state specific elements
+    if battle_state.state == BATTLE_STATE_INTRO:
+        # Draw emerging monster animation
+        emerge_progress = min(1.0, battle_state.intro_timer / 180)
+        monster_y = HEIGHT - (HEIGHT - battle_state.monster_y) * emerge_progress
+        
+        # Draw monster (octopus)
+        draw_octopus(battle_state.monster_x, monster_y, battle_state.monster_size)
+        
+        # Draw intro text with enhanced readability
+        # Create text background
+        text = title_font.render("Inner Voice Monster Appears!", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//3))
+        
+        # Draw text background
+        bg_rect = text_rect.copy()
+        bg_rect.inflate_ip(20, 10)
+        pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+        
+        # Draw text with glow
+        glow_surface = pygame.Surface(text.get_size(), pygame.SRCALPHA)
+        glow_color = (255, 255, 255, 50)
+        glow_text = title_font.render("Inner Voice Monster Appears!", True, glow_color)
+        for offset in range(0, 10, 2):
+            screen.blit(glow_text, (text_rect.x - offset, text_rect.y))
+            screen.blit(glow_text, (text_rect.x + offset, text_rect.y))
+        screen.blit(text, text_rect)
+    
+    elif battle_state.state == BATTLE_STATE_FIGHTING:
+        # Draw monster if visible
+        if battle_state.monster_visible:
+            draw_octopus(battle_state.monster_x, battle_state.monster_y, 
+                        battle_state.monster_size)
+            
+            # Show "Critical Thoughts Attack" with enhanced readability
+            if len(battle_state.rocks) > 0:
+                attack_text = game_font.render("Critical Thoughts Attack!", True, (255, 0, 0))
+                text_rect = attack_text.get_rect(centerx=WIDTH//2, y=50)
+                
+                # Draw text background
+                bg_rect = text_rect.copy()
+                bg_rect.inflate_ip(20, 10)
+                pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+                
+                # Add glow effect
+                glow_surface = pygame.Surface(attack_text.get_size(), pygame.SRCALPHA)
+                for i in range(10):
+                    alpha = int(150 * (1 - i/10))  # Increased alpha for better visibility
+                    color = (255, 0, 0, alpha)
+                    glow_text = game_font.render("Critical Thoughts Attack!", True, color)
+                    screen.blit(glow_text, (text_rect.x - i, text_rect.y))
+                screen.blit(attack_text, text_rect)
+        
+        # Draw rocks with enhanced effects
+        for rock in battle_state.rocks:
+            rock.draw(screen)
+        
+        # Draw flowers
+        for flower in battle_state.flowers:
+            flower.draw(screen)
+            # Show "Compassion Attack" with enhanced readability
+            if len(battle_state.flowers) > 0:
+                attack_text = game_font.render("Compassion Attack!", True, (255, 192, 203))
+                text_rect = attack_text.get_rect(centerx=WIDTH//2, bottom=HEIGHT-50)
+                
+                # Draw text background
+                bg_rect = text_rect.copy()
+                bg_rect.inflate_ip(20, 10)
+                pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect)
+                
+                # Add glow effect
+                glow_surface = pygame.Surface(attack_text.get_size(), pygame.SRCALPHA)
+                for i in range(10):
+                    alpha = int(150 * (1 - i/10))  # Increased alpha for better visibility
+                    color = (255, 192, 203, alpha)
+                    glow_text = game_font.render("Compassion Attack!", True, color)
+                    screen.blit(glow_text, (text_rect.x - i, text_rect.y))
+                screen.blit(attack_text, text_rect)
+        
+        # Draw boat with wave effect
+        boat_y_offset = math.sin(battle_animation_time * 2) * 5
+        rotated_boat = pygame.transform.rotate(boat_image, 
+                                            math.sin(battle_animation_time) * 5)
+        boat_rect = rotated_boat.get_rect(center=(battle_state.boat_x, 
+                                                 battle_state.boat_y + boat_y_offset))
+        screen.blit(rotated_boat, boat_rect)
+        
+        # Draw health bars
+        draw_battle_ui(battle_state)
+    
+    elif battle_state.state == BATTLE_STATE_WIN:
+        text = title_font.render("You defeated the Inner Voice Monster!", True, GOLD)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        screen.blit(text, text_rect)
+        
+        text = game_font.render("Press ESC to continue your journey", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2 + 60))
+        screen.blit(text, text_rect)
+        
+        # Set game as won
+        game_state = GAME_STATE_WINNER
+    
+    elif battle_state.state == BATTLE_STATE_LOSE:
+        text = title_font.render("The Monster overwhelmed you...", True, RED)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2))
+        screen.blit(text, text_rect)
+        
+        text = game_font.render("Press ESC to return to your journey", True, WHITE)
+        text_rect = text.get_rect(center=(WIDTH//2, HEIGHT//2 + 60))
+        screen.blit(text, text_rect)
+        
+        # Reset player's cards
+        player_card_counts[current_player] = {'reflection': 0, 'coping': 0}
+        collected_cards[current_player] = {'reflection': [], 'coping': []}
+
+def draw_octopus(x, y, size):
+    """Draw the octopus monster with enhanced graphics"""
+    # Draw glowing effect
+    glow_radius = size * 0.6 + math.sin(battle_animation_time * 0.1) * 10
+    glow_surface = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
+    for r in range(int(glow_radius), 0, -2):
+        alpha = int(100 * (r / glow_radius))
+        pygame.draw.circle(glow_surface, (128, 0, 128, alpha), 
+                         (glow_radius, glow_radius), r)
+    screen.blit(glow_surface, (x - glow_radius, y - glow_radius))
+
+    # Draw tentacles with gradient and wave effect
+    for i in range(8):  # Increased number of tentacles
+        angle = i * 45 + math.sin(battle_animation_time * 0.1) * 20
+        length = size * 1.2  # Longer tentacles
+        
+        # Create multiple segments for each tentacle
+        points = []
+        segments = 8  # More segments for smoother tentacles
+        for j in range(segments + 1):
+            progress = j / segments
+            segment_length = length * progress
+            wave_offset = math.sin(battle_animation_time * 0.2 + progress * 4) * (size * 0.2)
+            
+            segment_x = x + math.cos(math.radians(angle)) * segment_length
+            segment_y = y + math.sin(math.radians(angle)) * segment_length
+            
+            # Add wave motion
+            segment_x += math.cos(math.radians(angle + 90)) * wave_offset
+            segment_y += math.sin(math.radians(angle + 90)) * wave_offset
+            
+            points.append((segment_x, segment_y))
+        
+        # Draw tentacle with gradient
+        if len(points) >= 2:
+            for k in range(len(points) - 1):
+                progress = k / (len(points) - 1)
+                thickness = int((1 - progress) * size * 0.2)
+                color = (
+                    128 + int(progress * 40),
+                    0,
+                    128 + int(progress * 40),
+                )
+                pygame.draw.line(screen, color, points[k], points[k + 1], thickness)
+
+    # Draw body with gradient
+    body_radius = int(size * 0.5)
+    body_surface = pygame.Surface((body_radius * 2, body_radius * 2), pygame.SRCALPHA)
+    for r in range(body_radius, 0, -1):
+        progress = r / body_radius
+        color = (
+            128 + int((1 - progress) * 40),
+            0,
+            128 + int((1 - progress) * 40),
+            255
+        )
+        pygame.draw.circle(body_surface, color, (body_radius, body_radius), r)
+    screen.blit(body_surface, (x - body_radius, y - body_radius))
+
+    # Draw eyes with glow
+    eye_size = size * 0.15
+    eye_offset = size * 0.2
+    
+    # Draw eye glow
+    for eye_x in [x - eye_offset, x + eye_offset]:
+        glow_size = eye_size * 1.5
+        eye_glow = pygame.Surface((int(glow_size * 2), int(glow_size * 2)), pygame.SRCALPHA)
+        for r in range(int(glow_size), 0, -1):
+            alpha = int(100 * (r / glow_size))
+            pygame.draw.circle(eye_glow, (255, 0, 0, alpha), 
+                             (glow_size, glow_size), r)
+        screen.blit(eye_glow, (eye_x - glow_size, y - glow_size))
+    
+    # Draw main eyes
+    for eye_x in [x - eye_offset, x + eye_offset]:
+        pygame.draw.circle(screen, (255, 255, 255), (int(eye_x), int(y)), int(eye_size))
+        pygame.draw.circle(screen, (255, 0, 0), (int(eye_x), int(y)), int(eye_size * 0.6))
+        pygame.draw.circle(screen, (0, 0, 0), (int(eye_x), int(y)), int(eye_size * 0.3))
+        # Add highlight
+        pygame.draw.circle(screen, (255, 255, 255), 
+                         (int(eye_x - eye_size * 0.2), int(y - eye_size * 0.2)), 
+                         int(eye_size * 0.1))
+
+def draw_battle_ui(battle_state):
+    """Draw the battle UI including health bars and instructions"""
+    # Draw boat health
+    health_width = 200
+    health_height = 20
+    health_x = 20
+    health_y = 20
+    
+    pygame.draw.rect(screen, (64, 64, 64), (health_x, health_y, health_width, health_height))
+    health_percent = battle_state.boat_health / BOAT_STARTING_HEALTH
+    pygame.draw.rect(screen, (0, 255, 0), 
+                    (health_x, health_y, health_width * health_percent, health_height))
+    
+    # Draw monster health
+    monster_health_x = WIDTH - health_width - 20
+    pygame.draw.rect(screen, (64, 64, 64), 
+                    (monster_health_x, health_y, health_width, health_height))
+    monster_health_percent = battle_state.monster_health / MONSTER_HITS_TO_WIN
+    pygame.draw.rect(screen, (255, 0, 0), 
+                    (monster_health_x, health_y, health_width * monster_health_percent, 
+                     health_height))
+    
+    # Draw instructions
+    instructions = [
+        "← → : Move boat",
+        "SPACE : Launch compassion flower",
+        "ESC : Retreat"
+    ]
+    
+    y = HEIGHT - 100
+    for instruction in instructions:
+        text = instruction_font.render(instruction, True, WHITE)
+        text_rect = text.get_rect(left=20, top=y)
+        screen.blit(text, text_rect)
+        y += 25
+
+# Initialize battle button
+battle_button = BattleButton()
+
+# Start background music when game starts
+if background_music is not None:
+    background_music.play(-1)
+
+async def main():
+    pygame.init()
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Sea Journey - Inner Voice Battle")
+    
+    # Initialize game state variables
+    game_state = GAME_STATE_MENU
+    running = True
+    battle_button = BattleButton()
+    
+    # Start background music when game starts
+    if background_music is not None:
+        background_music.play(-1)
+    
+    while running:
+        # Store the close button rect for click detection
+        close_button_rect = None
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    # Get the current close button rect
+                    close_button_rect = draw_close_button()
+                    if close_button_rect and close_button_rect.collidepoint(event.pos):
+                        running = False
+                        pygame.quit()
+                        sys.exit()
+                    
+                    # Handle battle button click
+                    if game_state == GAME_STATE_PLAYING and battle_button.rect.collidepoint(event.pos):
+                        game_state = GAME_STATE_BATTLE
+                        battle_messages = ["The battle begins!",
+                                        f"You have {player_card_counts[current_player]['reflection']} reflection cards",
+                                        f"and {player_card_counts[current_player]['coping']} coping cards"]
+                    
+                    # Handle card selection in exchange state
+                    if EXCHANGE_STATE == 'selecting' and isinstance(centered_card, ExchangeInterface):
+                        for i, card in enumerate(centered_card.cards):
+                            if card['rect'].collidepoint(event.pos):
+                                centered_card.selected_index = i
+                                break
+            
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_m:  # Add music toggle with 'M' key
+                    toggle_music()
+                
+                if game_state == GAME_STATE_MENU:
+                    if event.key == pygame.K_1:
+                        play_sound(collect_card_sound)
+                        num_players = 1
+                        game_state = GAME_STATE_PLAYING
+                    elif event.key == pygame.K_2:
+                        play_sound(collect_card_sound)
+                        num_players = 2
+                        game_state = GAME_STATE_PLAYING
+                
+                elif game_state == GAME_STATE_PLAYING and event.key == pygame.K_SPACE:
+                    if waiting_for_card_interaction or EXCHANGE_STATE == 'moving':
+                        handle_card_interaction(event)
+                    elif can_roll:
+                        play_sound(dice_roll_sound)
+                        current_roll = roll_dice()
+                        can_roll = False
+                        waiting_for_card_interaction, card_type = move_boat(current_roll)
+                        
+                        if check_boats_meeting():
+                            waiting_for_card_interaction = True
+                            EXCHANGE_STATE = 'selecting'
+                            centered_card = ExchangeInterface(player_card_counts)
+                        elif waiting_for_card_interaction and current_card_symbol:
+                            centered_card = CenteredCard(current_card_symbol, card_type)
+                        else:
+                            can_roll = True
+                
+                elif game_state == GAME_STATE_BATTLE:
+                    if event.key == pygame.K_ESCAPE:
+                        game_state = GAME_STATE_PLAYING
+                        battle_state = None
+                    elif event.key == pygame.K_SPACE and battle_state and battle_state.state == BATTLE_STATE_FIGHTING:
+                        # Launch compassion flower
+                        battle_state.flowers.append(CompassionFlower(battle_state.boat_x, battle_state.boat_y - boat_size//2))
+        
+        # Draw current game state
+        if game_state == GAME_STATE_MENU:
+            draw_menu()
+        elif game_state == GAME_STATE_BATTLE:
+            if battle_state:
+                battle_state.update()
+            draw_battle_screen()
+        else:
+            draw_game_state()
+            battle_button.update(pygame.mouse.get_pos())
+            battle_button.draw(screen)
+            
+            if waiting_for_card_interaction and centered_card:
+                centered_card.update()
+                centered_card.draw(screen)
+            
+            # Update and draw card animations
+            if animation_cards:
+                for card in animation_cards[:]:
+                    card.update()
+                    card.draw(screen, pygame.font.Font(None, 20))
+                    if not card.moving:
+                        animation_cards.remove(card)
+        
+        # Always draw the close button last so it's on top
+        close_button_rect = draw_close_button()
+        pygame.display.flip()
+        await asyncio.sleep(0)  # Required for web compatibility
+    
+    pygame.quit()
+    if background_music is not None:
+        background_music.stop()
+    mixer.quit()
+
+# Initialize battle state
+battle_state = None
+battle_animation_time = 0
+battle_result = None
+battle_messages = []
+BATTLE_STATE_INTRO = 'intro'
+BATTLE_STATE_FIGHTING = 'fighting'
+BATTLE_STATE_WIN = 'win'
+BATTLE_STATE_LOSE = 'lose'
+BOAT_BATTLE_SPEED = 5
+ROCK_SPEED = 4
+FLOWER_SPEED = 7
+MONSTER_HITS_TO_WIN = 20  # Increased from 10 to 20 hits
+BOAT_STARTING_HEALTH = 3
+
+class BattleState:
+    def __init__(self):
+        self.state = BATTLE_STATE_INTRO
+        self.boat_x = WIDTH * 0.2
+        self.boat_y = HEIGHT * 0.8
+        self.monster_x = WIDTH * 0.8
+        self.monster_y = HEIGHT * 0.3
+        self.monster_size = 200
+        self.monster_health = MONSTER_HITS_TO_WIN
+        self.boat_health = BOAT_STARTING_HEALTH
+        self.rocks = []
+        self.flowers = []
+        self.rock_spawn_timer = 0
+        self.monster_move_timer = 0
+        self.intro_timer = 0
+        self.monster_visible = True
+        self.monster_moving = False
+        self.monster_target_x = self.monster_x
+        self.boat_rect = pygame.Rect(self.boat_x - boat_size//2, 
+                                   self.boat_y - boat_size//2, 
+                                   boat_size, boat_size)
+        self.monster_rect = pygame.Rect(self.monster_x - self.monster_size//2, 
+                                      self.monster_y - self.monster_size//2,
+                                      self.monster_size, self.monster_size)
+
+    def update(self):
+        if self.state == BATTLE_STATE_INTRO:
+            self.intro_timer += 1
+            if self.intro_timer > 180:  # 3 seconds at 60 FPS
+                self.state = BATTLE_STATE_FIGHTING
+        
+        elif self.state == BATTLE_STATE_FIGHTING:
+            # Update boat position based on keyboard input
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_LEFT]:
+                self.boat_x = max(boat_size//2, self.boat_x - BOAT_BATTLE_SPEED)
+            if keys[pygame.K_RIGHT]:
+                self.boat_x = min(WIDTH - boat_size//2, self.boat_x + BOAT_BATTLE_SPEED)
+            
+            # Update boat rect
+            self.boat_rect.x = self.boat_x - boat_size//2
+            self.boat_rect.y = self.boat_y - boat_size//2
+            
+            # Monster movement
+            if not self.monster_moving and random.random() < 0.02:  # 2% chance to start moving
+                self.monster_moving = True
+                self.monster_visible = False
+                self.monster_target_x = random.randint(int(WIDTH * 0.6), int(WIDTH * 0.9))
+                self.monster_y = HEIGHT * 0.3  # Reset height when moving
+            
+            if self.monster_moving:
+                self.monster_move_timer += 1
+                if self.monster_move_timer > 60:  # Show monster after 1 second
+                    self.monster_visible = True
+                    # Move towards target
+                    dx = self.monster_target_x - self.monster_x
+                    if abs(dx) < 2:
+                        self.monster_moving = False
+                        self.monster_move_timer = 0
+                    else:
+                        self.monster_x += dx * 0.1
+            
+            # Update monster rect
+            self.monster_rect.x = self.monster_x - self.monster_size//2
+            self.monster_rect.y = self.monster_y - self.monster_size//2
+            
+            # Spawn rocks with increasing frequency as monster gets smaller
+            spawn_rate = max(15, 45 - (MONSTER_HITS_TO_WIN - self.monster_health))  # More aggressive scaling
+            self.rock_spawn_timer += 1
+            if self.rock_spawn_timer > spawn_rate and self.monster_visible:
+                self.rock_spawn_timer = 0
+                num_rocks = min(5, 2 + (MONSTER_HITS_TO_WIN - self.monster_health) // 4)  # Increase rocks based on damage
+                for _ in range(num_rocks):  # Spawn multiple rocks
+                    rock_x = self.monster_x + random.randint(-50, 50)
+                    self.rocks.append(Rock(rock_x, self.mon

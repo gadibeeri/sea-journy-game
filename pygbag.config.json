@@ -1,0 +1,12 @@
+{
+    "app_name": "Sea Journey - Inner Voice Battle",
+    "requirements": ["pygame==2.5.2"],
+    "assets": ["assets/*"],
+    "main_script": "game.py",
+    "build_path": "build/web",
+    "options": {
+        "canvas_width": 900,
+        "canvas_height": 700,
+        "fullscreen": false
+    }
+} 
